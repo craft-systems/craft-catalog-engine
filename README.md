@@ -18,18 +18,18 @@ reciben. Ver la deuda que esto resuelve: catálogo forkeado en 5 estructuras dis
 
 ```html
 <head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jcgomezd1301/craft-catalog-engine@v3/catalog.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jcgomezd1301/craft-catalog-engine@v1/catalog.css">
   <style id="craft-vars">:root{ --primary:#E4801C; --accent:#F5B301; }</style> <!-- anti-FOUC, lo genera catalogsync -->
   <link rel="stylesheet" href="./theme.css"> <!-- opcional: CSS bespoke del cliente -->
 </head>
 <body>
   <!-- ...shell del catálogo (hero, #catalog, modal, drawer)... -->
-  <script src="https://cdn.jsdelivr.net/gh/jcgomezd1301/craft-catalog-engine@v3/catalog.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/jcgomezd1301/craft-catalog-engine@v1/catalog.js" defer></script>
 </body>
 ```
 
-El path `@v3` es un **tag git inmutable** servido por jsDelivr (CDN global, cacheado).
-Para publicar un cambio: commit → `git tag v4 && git push --tags` → repuntar clientes a `@v4`
+El path `@v1` es un **tag git inmutable** servido por jsDelivr (CDN global, cacheado).
+Para publicar un cambio: commit → `git tag v2 && git push --tags` → repuntar clientes a `@v2`
 tras smoke-test en un canario. Un deploy malo nunca rompe a todos a la vez.
 
 ## Tokens de tema (por cliente, editables desde craft-crm)
