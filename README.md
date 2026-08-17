@@ -18,18 +18,20 @@ reciben. Ver la deuda que esto resuelve: catálogo forkeado en 5 estructuras dis
 
 ```html
 <head>
-  <link rel="stylesheet" href="https://engine.craftmarketing.agency/v1/catalog.css">
+  <link rel="stylesheet" href="https://craft-catalog-engine.pages.dev/v1/catalog.css">
   <style id="craft-vars">:root{ --primary:#E4801C; --accent:#F5B301; }</style> <!-- anti-FOUC, lo genera catalogsync -->
   <link rel="stylesheet" href="./theme.css"> <!-- opcional: CSS bespoke del cliente -->
 </head>
 <body>
   <!-- ...shell del catálogo (hero, #catalog, modal, drawer)... -->
-  <script src="https://engine.craftmarketing.agency/v1/catalog.js" defer></script>
+  <script src="https://craft-catalog-engine.pages.dev/v1/catalog.js" defer></script>
 </body>
 ```
 
 **Hosting:** Cloudflare Pages en la cuenta principal (org GitHub `craft-systems`, integración
-nativa Git → push a `master` despliega solo). Dominio `engine.craftmarketing.agency`.
+nativa Git → push a `master` despliega solo). URL en uso: `craft-catalog-engine.pages.dev`.
+**Dominio custom `engine.craftmarketing.agency` PENDIENTE** (aún no resuelve/SSL): agregarlo en el
+proyecto Pages → Custom domains; cuando dé 200 en navegador, repuntar todo de pages.dev → el dominio.
 
 **Versionado = carpeta en la ruta** (Cloudflare sirve por ruta, no por tag git). La versión
 publicada vive en `/vN/`; para sacar una nueva se crea `/v2/` (NUNCA se edita `/v1/` una vez
