@@ -80,6 +80,7 @@
     }
     const badgeCat=()=>config.badge_category||null;
     const isOffer=p=>!!p.precio_promo||(badgeCat()&&(p.categorias||[]).includes(badgeCat()));
+    const isPromo=p=>p.tipo==='promocion';
 
     // Category → emoji icon (keyword match on slug + visible name)
     const CAT_ICONS=[['hamburg','🍔'],['burger','🍔'],['pizza','🍕'],['pollo','🍗'],['alit','🍗'],['wing','🍗'],
@@ -208,6 +209,42 @@
         </button>`;
     }
 
+    /* ── PROMO BANNER (productos con tipo 'promocion' → banner clickeable → openModal) ── */
+    // Aditivo: sin promos devuelve '' y el catálogo se ve idéntico al de siempre.
+    function promoBannerHTML(){
+      const promos=products.filter(isPromo);
+      if(!promos.length) return '';
+      const slides=promos.map(p=>{
+        const img=getImages(p)[0]||'';
+        return `<div class="promo-slide${img?'':' no-img'}" data-open="${p.id}" ${img?`style="background-image:url('${img}')"`:''}>
+          <div class="promo-shade"></div>
+          <div class="promo-content">
+            <div class="promo-title">${p.nombre}</div>
+            <div class="promo-cta">Ver oferta <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+        </div>`;
+      }).join('');
+      const dots=promos.length>1?`<div class="promo-dots" id="promoDots">${promos.map((_,i)=>`<button class="promo-dot${i===0?' active':''}" data-pidx="${i}" aria-label="Promo ${i+1}"></button>`).join('')}</div>`:'';
+      return `<div class="promo-banner"><div class="promo-track" id="promoTrack">${slides}</div>${dots}</div>`;
+    }
+    let promoTimer,promoIdx=0;
+    function setupPromoBanner(){
+      clearInterval(promoTimer);
+      const track=document.getElementById('promoTrack');
+      if(!track) return;
+      const n=track.children.length;promoIdx=0;
+      const go=i=>{
+        promoIdx=(i+n)%n;
+        track.style.transform=`translateX(-${promoIdx*100}%)`;
+        document.querySelectorAll('.promo-dot').forEach((d,k)=>d.classList.toggle('active',k===promoIdx));
+      };
+      document.getElementById('promoDots')?.addEventListener('click',e=>{const d=e.target.closest('.promo-dot');if(d)go(+d.dataset.pidx);});
+      let sx=0;
+      track.addEventListener('touchstart',e=>sx=e.changedTouches[0].clientX,{passive:true});
+      track.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>40)go(dx<0?promoIdx+1:promoIdx-1);});
+      if(n>1) promoTimer=setInterval(()=>go(promoIdx+1),4500);
+    }
+
     /* ── RENDER CATALOG ── */
     function matchSearch(p){
       return !searchQuery||normalize(p.nombre).includes(searchQuery)||normalize(p.descripcion||'').includes(searchQuery);
@@ -230,6 +267,7 @@
       }
 
       const filtered=products.filter(p=>{
+        if(isPromo(p)) return false; // promos van solo en el banner, no en el grid
         const matchCat=activeFilter==='all'||(p.categorias||[]).includes(activeFilter);
         return matchCat&&matchSearch(p);
       });
@@ -237,7 +275,8 @@
       filtered.forEach(p=>{const c=(p.categorias||[])[0]||'';(groups[c]=groups[c]||[]).push(p);});
 
       const catLabels=config.categories||{};
-      let html='';
+      // Banner de promos: solo en la vista 'all' sin búsqueda (como el hero de la referencia).
+      let html=(activeFilter==='all'&&!searchQuery)?promoBannerHTML():'';
       categorySlugs.forEach(cat=>{
         const inCat=groups[cat]||[];
         if(!inCat.length) return;
@@ -248,6 +287,7 @@
       });
       $catalog.innerHTML=html||`<div class="empty-state"><span class="em">🔍</span><p>No se encontraron productos</p></div>`;
       setActiveChip(activeFilter);
+      setupPromoBanner();
       setupIntersectionObserver();
     }
 

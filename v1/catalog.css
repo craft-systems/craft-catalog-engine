@@ -453,3 +453,23 @@
       .sede-card.full{max-width:100%}
       .location-view-wrap{padding:14px 14px 32px}
     }
+
+    /* ── PROMO BANNER (tipo 'promocion') ── */
+    .promo-banner{margin:4px 14px 18px;border-radius:var(--radius);overflow:hidden;position:relative}
+    .promo-track{display:flex;transition:transform .45s cubic-bezier(.4,0,.2,1)}
+    .promo-slide{position:relative;flex:0 0 100%;aspect-ratio:2/1;background-size:cover;background-position:center;
+      cursor:pointer;display:flex;align-items:flex-end}
+    .promo-slide.no-img{background:linear-gradient(120deg,var(--primary),var(--accent))}
+    .promo-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.28) 45%,transparent 75%)}
+    .promo-content{position:relative;padding:16px 18px;max-width:70%;color:#fff}
+    .promo-title{font-size:22px;font-weight:800;line-height:1.1;text-shadow:0 2px 10px rgba(0,0,0,.45)}
+    .promo-cta{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:7px 14px;border-radius:999px;
+      background:var(--primary);color:#fff;font-size:13px;font-weight:700}
+    .promo-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:6px}
+    .promo-dot{width:7px;height:7px;border-radius:50%;border:0;padding:0;cursor:pointer;background:rgba(255,255,255,.5)}
+    .promo-dot.active{background:#fff;width:18px;border-radius:4px}
+    @media(max-width:520px){
+      .promo-banner{margin:2px 12px 14px}
+      .promo-title{font-size:18px}
+      .promo-content{max-width:80%;padding:14px}
+    }
