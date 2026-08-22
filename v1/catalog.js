@@ -715,6 +715,13 @@
         `<br><span class="footer-credit">Powered by <a href="https://craftmarketing.agency" target="_blank" rel="noopener">craftmarketing.agency</a></span>`;
       if(config.hero_title) document.getElementById('heroTitle').innerHTML=config.hero_title;
 
+      // Burbuja de WhatsApp: número dinámico desde config (no hardcodear en el index).
+      const waFloat=document.querySelector('.wa-float'),waBubble=(config.whatsapp_number||'').replace(/\D/g,'');
+      if(waFloat){
+        if(waBubble) waFloat.href=`https://wa.me/${waBubble}?text=${encodeURIComponent(config.whatsapp_message||'¡Hola! Quiero hacer un pedido:')}`;
+        else waFloat.style.display='none';
+      }
+
       const mu=config.min_units,md=config.min_days_advance;
       if(mu||md){
         const parts=[];
