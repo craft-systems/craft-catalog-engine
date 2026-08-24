@@ -81,6 +81,14 @@
     const badgeCat=()=>config.badge_category||null;
     const isOffer=p=>!!p.precio_promo||(badgeCat()&&(p.categorias||[]).includes(badgeCat()));
     const isPromo=p=>p.tipo==='promocion';
+    // Oferta activa hoy: sku lleva el/los día(s) de la semana (0=dom..6=sáb, coma-sep). Vacío = siempre.
+    // ponytail: reusar sku como día de la promo; migrar a columna promo_days si se necesita SKU real en promos.
+    const promoActiveToday=p=>{
+      const raw=(p.sku||'').trim();
+      if(!raw) return true;
+      const today=new Date().getDay();
+      return raw.split(',').map(s=>parseInt(s,10)).includes(today);
+    };
 
     // Category → emoji icon (keyword match on slug + visible name)
     const CAT_ICONS=[['hamburg','🍔'],['burger','🍔'],['pizza','🍕'],['pollo','🍗'],['alit','🍗'],['wing','🍗'],
@@ -212,7 +220,7 @@
     /* ── PROMO BANNER (productos con tipo 'promocion' → banner clickeable → openModal) ── */
     // Aditivo: sin promos devuelve '' y el catálogo se ve idéntico al de siempre.
     function promoBannerHTML(){
-      const promos=products.filter(isPromo);
+      const promos=products.filter(p=>isPromo(p)&&promoActiveToday(p));
       if(!promos.length) return '';
       const slides=promos.map(p=>{
         const img=getImages(p)[0]||'';
@@ -242,7 +250,7 @@
       let sx=0;
       track.addEventListener('touchstart',e=>sx=e.changedTouches[0].clientX,{passive:true});
       track.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>40)go(dx<0?promoIdx+1:promoIdx-1);});
-      if(n>1) promoTimer=setInterval(()=>go(promoIdx+1),4500);
+      if(n>1) promoTimer=setInterval(()=>go(promoIdx+1),7000);
     }
 
     /* ── RENDER CATALOG ── */
@@ -262,7 +270,7 @@
       }
       if(activeFilter==='__offers__'){
         setActiveChip(null);
-        renderFlat(products.filter(p=>isOffer(p)&&matchSearch(p)),'Ofertas','🏷️','No hay ofertas activas ahora mismo.');
+        renderFlat(products.filter(p=>((isPromo(p)&&promoActiveToday(p))||isOffer(p))&&matchSearch(p)),'Ofertas','🏷️','No hay ofertas activas ahora mismo.');
         return;
       }
 
