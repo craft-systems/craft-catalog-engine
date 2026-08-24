@@ -99,7 +99,16 @@
       ['pasta','🍝'],['sopa','🍲'],['caldo','🍲'],['marisc','🦐'],['camaron','🦐'],['ceviche','🦐'],['pescado','🐟'],
       ['desayuno','🍳'],['huevo','🍳'],['pan','🥖'],['empana','🥟'],['dona','🍩'],['galleta','🍪'],['pastel','🎂'],
       ['torta','🎂'],['fruta','🍓'],['vega','🥗'],['bowl','🥣'],['arroz','🍚']];
+    // Emoji líder de un texto (el que el operador pone en el nombre de la categoría), '' si no hay.
+    const leadingEmoji=str=>{
+      const m=(str||'').match(/^\s*(\p{Extended_Pictographic}(?:[️‍\u{1F3FB}-\u{1F3FF}]|\p{Extended_Pictographic})*)/u);
+      return m?m[1].trim():'';
+    };
+    // Nombre de categoría sin el emoji líder (para el label del chip / header).
+    const catLabel=name=>{const e=leadingEmoji(name);return e?(name||'').replace(e,'').trim():(name||'');};
     function catIcon(slug,name){
+      const e=leadingEmoji(name);          // el emoji del nombre manda (control del operador desde el CRM)
+      if(e) return e;
       const s=normalize(slug+' '+(name||''));
       for(const [k,ic] of CAT_ICONS) if(s.includes(normalize(k))) return ic;
       return '🍽️';
@@ -164,7 +173,7 @@
       let html=`<button class="cat-chip active" data-cat="all"><span class="ic">🔥</span><span class="lb">Todo</span></button>`;
       categorySlugs.forEach(slug=>{
         const name=catMap[slug]||slug;
-        html+=`<button class="cat-chip" data-cat="${slug}"><span class="ic">${catIcon(slug,name)}</span><span class="lb">${name}</span></button>`;
+        html+=`<button class="cat-chip" data-cat="${slug}"><span class="ic">${catIcon(slug,name)}</span><span class="lb">${catLabel(name)}</span></button>`;
       });
       $catStrip.innerHTML=html;
     }
@@ -289,7 +298,7 @@
         const inCat=groups[cat]||[];
         if(!inCat.length) return;
         html+=`<div class="cat-section" id="cat-${cat}">
-          <h2 class="cat-header"><span class="em">${catIcon(cat,catLabels[cat])}</span>${catLabels[cat]||cat}</h2>
+          <h2 class="cat-header"><span class="em">${catIcon(cat,catLabels[cat])}</span>${catLabel(catLabels[cat])||cat}</h2>
           <div class="grid">${inCat.map((p,i)=>cardHTML(p,i)).join('')}</div>
         </div>`;
       });

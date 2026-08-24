@@ -20,4 +20,18 @@ assert.strictEqual(activeOn('5,6', 0), false);
 // domingo = 0
 assert.strictEqual(activeOn('0', 0), true);
 
-console.log('ok — promo day filter');
+// --- ícono/label de categoría desde el emoji líder del nombre (misma lógica que catIcon/catLabel) ---
+const leadingEmoji = str => {
+  const m = (str || '').match(/^\s*(\p{Extended_Pictographic}(?:[️‍\u{1F3FB}-\u{1F3FF}]|\p{Extended_Pictographic})*)/u);
+  return m ? m[1].trim() : '';
+};
+const catLabel = name => { const e = leadingEmoji(name); return e ? (name || '').replace(e, '').trim() : (name || ''); };
+
+assert.strictEqual(leadingEmoji('🧀 Bites'), '🧀');
+assert.strictEqual(catLabel('🧀 Bites'), 'Bites');
+assert.strictEqual(leadingEmoji('🍽️ Almuerzos'), '🍽️');   // emoji con variation selector
+assert.strictEqual(catLabel('🍽️ Almuerzos'), 'Almuerzos');
+assert.strictEqual(leadingEmoji('Sin Emoji'), '');          // sin emoji → keyword match / name tal cual
+assert.strictEqual(catLabel('Sin Emoji'), 'Sin Emoji');
+
+console.log('ok — promo day filter + category emoji');
