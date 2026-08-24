@@ -42,7 +42,11 @@
     const getOptionDelta=o=>{const m=String(getOptionDisplay(o)).match(/\+\s*\$\s*([0-9]+(?:[.,][0-9]+)?)/);return m?parseFloat(m[1].replace(',','.')):0;};
     // ponytail: alitas/wings con >=8 uds y >1 salsa → repartir cantidad por salsa. Total sale del nombre ("x 8", "x20").
     const unitCount=p=>{const m=(p.nombre||'').match(/x\s*(\d+)/i);return m?+m[1]:0;};
-    function wingsDist(p){
+    function distGroup(p){
+      // Grupo explícito de distribución (elige N repartibles): total = número en el nombre del grupo.
+      const dg=(p.variantes||[]).find(g=>g.type==='distribute'&&Array.isArray(g.options)&&g.options.length>1);
+      if(dg){const m=String(dg.name||'').match(/\d+/);return{group:dg,total:m?+m[0]:1};}
+      // Alitas: total = cantidad en el nombre del producto ("x N"), categoría alitas/wings.
       if(unitCount(p)<8) return null;
       if(!(p.categorias||[]).some(c=>/alit|wing/i.test(c))) return null;
       const g=(p.variantes||[]).find(g=>Array.isArray(g.options)&&g.options.length>1);
@@ -417,7 +421,7 @@
       const p=modalProduct;
       const hasVariants=Array.isArray(p.variantes)&&p.variantes.length>0;
       const stock=getStockInfo(p);
-      const dist=wingsDist(p);
+      const dist=distGroup(p);
       const distSum=dist?dist.group.options.reduce((s,o)=>s+(modalDist[getOptionKey(o)]||0),0):0;
       const allSelected=!hasVariants||(dist?distSum===dist.total:p.variantes.every((_,i)=>modalVariants[i]));
       const effPrice=allSelected&&!dist?getEffectivePrice(p,modalVariants):parsePrice(p);

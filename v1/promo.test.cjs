@@ -34,4 +34,10 @@ assert.strictEqual(catLabel('🍽️ Almuerzos'), 'Almuerzos');
 assert.strictEqual(leadingEmoji('Sin Emoji'), '');          // sin emoji → keyword match / name tal cual
 assert.strictEqual(catLabel('Sin Emoji'), 'Sin Emoji');
 
-console.log('ok — promo day filter + category emoji');
+// --- total de un grupo de distribución = número en el nombre del grupo (misma lógica que distGroup) ---
+const distTotal = groupName => { const m = String(groupName || '').match(/\d+/); return m ? +m[0] : 1; };
+assert.strictEqual(distTotal('Elige tus 3 sabores'), 3);
+assert.strictEqual(distTotal('Elige 2 sabores'), 2);
+assert.strictEqual(distTotal('Sabores'), 1);
+
+console.log('ok — promo day filter + category emoji + dist total');
