@@ -160,7 +160,22 @@
     const saveCart=()=>{try{localStorage.setItem('menu_cart',JSON.stringify(cartItems));}catch(e){}};
     function loadCart(){try{const s=JSON.parse(localStorage.getItem('menu_cart')||'[]');if(Array.isArray(s))cartItems=s;}catch(e){}}
     const cartTotalQty=()=>cartItems.reduce((s,i)=>s+i.qty,0);
-    const cartTotalPrice=()=>cartItems.reduce((s,i)=>s+i.precio*i.qty,0);
+    const cartTotalPrice=()=>cartItems.reduce((s,i)=>s+i.precio*i.qty,0)+envaseTotal();
+
+    /* ── ENVASE automático (derivado, no se guarda en el carrito) ──
+       Opt-in por config.envase={price,label,exclude?:[slug]}. 1 envase por unidad de comida.
+       ponytail: exclude por categoría es el knob reusable del engine; sin config = no-op. */
+    const envaseCfg=()=>{const e=config.envase;return e&&+e.price>0?e:null;};
+    function envaseQty(){
+      const e=envaseCfg();if(!e)return 0;
+      const skip=Array.isArray(e.exclude)?e.exclude:[];
+      return cartItems.reduce((s,i)=>{
+        if(skip.length){const p=products.find(x=>String(x.id)===String(i.id));
+          if(p&&(p.categorias||[]).some(c=>skip.includes(c)))return s;}
+        return s+i.qty;
+      },0);
+    }
+    const envaseTotal=()=>{const e=envaseCfg();return e?envaseQty()*(+e.price):0;};
 
     /* ── CATEGORY STRIP ── */
     // Orden: config.category_order primero (el sync lo preserva), luego el resto. El sync
@@ -556,7 +571,7 @@
         $cartItems.innerHTML=`<div class="cart-empty"><span class="em">🛒</span><p>Tu pedido está vacío</p></div>`;
         return;
       }
-      $cartItems.innerHTML=cartItems.map(item=>{
+      let itemsHTML=cartItems.map(item=>{
         const vLabel=variantLabel(item.variantes);
         return `<div class="cart-item">
           ${item.imagen?`<img src="${item.imagen}" alt="${item.nombre}" loading="lazy"/>`:`<div class="ph">🍽️</div>`}
@@ -568,6 +583,17 @@
           <button class="cart-item-remove" data-key="${item.key}" title="Quitar">✕</button>
         </div>`;
       }).join('');
+      const eq=envaseQty(),ec=envaseCfg();
+      if(ec&&eq>0){
+        itemsHTML+=`<div class="cart-item cart-item--envase">
+          <div class="ph">📦</div>
+          <div class="cart-item-info">
+            <div class="cart-item-name">${ec.label||'Envase'}</div>
+            <div class="cart-item-detail">${eq} × ${formatPrice(+ec.price)} = ${formatPrice(eq*+ec.price)}</div>
+          </div>
+        </div>`;
+      }
+      $cartItems.innerHTML=itemsHTML;
     }
     function openCart(){$cartOverlay.classList.add('open');$cartDrawer.classList.add('open');document.body.style.overflow='hidden';setActiveNav('cart');$cartPeek.classList.remove('show');}
     function closeCart(){$cartOverlay.classList.remove('open');$cartDrawer.classList.remove('open');document.body.style.overflow='';syncNavToFilter();updateCartUI();goToStep1();}
@@ -603,13 +629,16 @@
 
       // Notifica al dueño antes de abrir WA — fire-and-forget
       if(config.catalog_notify_url&&config.catalog_notify_token){
+        const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined}));
+        const eqN=envaseQty(),ecN=envaseCfg();
+        if(ecN&&eqN>0) notifyItems.push({nombre:ecN.label||'Envase',qty:eqN,precio:+ecN.price});
         fetch(config.catalog_notify_url,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
             token:config.catalog_notify_token,
             store_name:store,
-            items:cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined})),
+            items:notifyItems,
             total,currency:cur,
             client_name:name,client_phone:phone,
             delivery_mode:mode,address:address||undefined,
@@ -623,6 +652,8 @@
         const vLabel=variantLabel(item.variantes);
         msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
       });
+      const eq=envaseQty(),ec=envaseCfg();
+      if(ec&&eq>0) msg+=`▸ ${ec.label||'Envase'}\n  ${eq} × ${formatPrice(+ec.price)} = ${formatPrice(eq*+ec.price)}\n`;
       msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
       msg+=`*ENTREGA:* ${mode==='delivery'?'Domicilio':'Retiro en local'}\n`;
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
