@@ -10,7 +10,7 @@
     let searchQuery = '';
     let categorySlugs = [];
 
-    let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, sliderIdx = 0, sliderImages = [];
+    let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, sliderIdx = 0, sliderImages = [];
 
     /* ── DOM REFS ── */
     const $catalog=document.getElementById('catalog'),$searchInput=document.getElementById('searchInput'),
@@ -406,7 +406,7 @@
     /* ── PRODUCT MODAL ── */
     function openModal(id){
       const p=products.find(x=>String(x.id)===String(id));if(!p) return;
-      modalProduct=p;modalQty=1;modalVariants={};modalDist={};sliderImages=getImages(p);sliderIdx=0;
+      modalProduct=p;modalQty=1;modalVariants={};modalDist={};modalRepeat={};sliderImages=getImages(p);sliderIdx=0;
       $sliderTrack.innerHTML=sliderImages.length
         ?sliderImages.map(src=>`<div class="slider-slide"><img src="${src}" alt="${p.nombre}" loading="lazy"/></div>`).join('')
         :`<div class="slider-slide"><span class="slider-placeholder">${catIcon((p.categorias||[])[0],p.nombre)}</span></div>`;
@@ -417,13 +417,33 @@
       renderModalDetail();
       $modalOverlay.classList.add('open');document.body.style.overflow='hidden';
     }
+    // Variante-plantilla (repeat) que se clona N veces según la opción de combo elegida.
+    // N = "salsas" de la opción seleccionada en cualquier variante no-repeat. null si el
+    // producto no usa el mecanismo (retrocompatible: productos normales pasan por aquí sin efecto).
+    function repeatInfo(p){
+      if(!Array.isArray(p.variantes)) return null;
+      const ri=p.variantes.findIndex(v=>v&&v.repeat);
+      if(ri<0) return null;
+      let n=0;
+      for(let i=0;i<p.variantes.length;i++){
+        if(i===ri) continue;
+        const sel=modalVariants[i];if(sel===undefined) continue;
+        const opt=(p.variantes[i].options||[]).find(o=>getOptionKey(o)===sel);
+        if(opt&&typeof opt==='object'&&typeof opt.salsas==='number') n=opt.salsas;
+      }
+      return {ri,n,group:p.variantes[ri]};
+    }
     function renderModalDetail(){
       const p=modalProduct;
       const hasVariants=Array.isArray(p.variantes)&&p.variantes.length>0;
       const stock=getStockInfo(p);
       const dist=distGroup(p);
       const distSum=dist?dist.group.options.reduce((s,o)=>s+(modalDist[getOptionKey(o)]||0),0):0;
-      const allSelected=!hasVariants||(dist?distSum===dist.total:p.variantes.every((_,i)=>modalVariants[i]));
+      const rep=repeatInfo(p);
+      if(rep) Object.keys(modalRepeat).forEach(k=>{if(+k>=rep.n) delete modalRepeat[k];}); // recorta si baja N
+      const staticOK=!hasVariants||p.variantes.every((_,i)=>(rep&&i===rep.ri)||modalVariants[i]);
+      const repeatOK=!rep||rep.n===0||Array.from({length:rep.n}).every((_,k)=>modalRepeat[k]);
+      const allSelected=!hasVariants||(dist?distSum===dist.total:staticOK&&repeatOK);
       const effPrice=allSelected&&!dist?getEffectivePrice(p,modalVariants):parsePrice(p);
       const canAddModal=stock.canAdd&&allSelected;
 
@@ -443,24 +463,28 @@
       } else if(hasVariants){
         // opt.label already has price embedded (from processVariants price_select) — don't add it again
         const optLabel=opt=>{const d=getOptionDisplay(opt),pr=getOptionPrice(opt);return(pr!==null&&typeof opt==='string')?`${d} (${formatPrice(pr)})`:d;};
-        variantHTML='<div class="customize-label">Personaliza</div>'+p.variantes.map((g,idx)=>{
-          const cur=modalVariants[idx]||'';
-          if(g.options.length>4){
-            return `<div class="variant-group">
-              <div class="variant-glabel">${g.name||'Opciones'}</div>
-              <select class="variant-select" data-group-idx="${idx}">
+        // Renderiza un grupo de opciones: select si >4, botones si no. `attr` cablea el estado
+        // (data-group-idx para variantes normales, data-repeat-k para las clonadas).
+        const groupHTML=(glabel,attr,options,cur)=>options.length>4
+          ?`<div class="variant-group"><div class="variant-glabel">${glabel}</div>
+              <select class="variant-select" ${attr}>
                 <option value="">— Elige una opción —</option>
-                ${g.options.map(opt=>{const k=getOptionKey(opt);return`<option value="${k}"${cur===k?' selected':''}>${optLabel(opt)}</option>`;}).join('')}
-              </select>
-            </div>`;
-          }
-          return `<div class="variant-group">
-            <div class="variant-glabel">${g.name||'Opciones'}</div>
-            <div class="variant-options">
-              ${g.options.map(opt=>{const oKey=getOptionKey(opt);return`<button class="variant-option${cur===oKey?' selected':''}" data-group-idx="${idx}" data-opt="${oKey}">${optLabel(opt)}</button>`;}).join('')}
-            </div>
-          </div>`;
-        }).join('');
+                ${options.map(opt=>{const k=getOptionKey(opt);return`<option value="${k}"${cur===k?' selected':''}>${optLabel(opt)}</option>`;}).join('')}
+              </select></div>`
+          :`<div class="variant-group"><div class="variant-glabel">${glabel}</div>
+              <div class="variant-options">
+                ${options.map(opt=>{const oKey=getOptionKey(opt);return`<button class="variant-option${cur===oKey?' selected':''}" ${attr} data-opt="${oKey}">${optLabel(opt)}</button>`;}).join('')}
+              </div></div>`;
+        const staticHTML=p.variantes.map((g,idx)=>
+          (rep&&idx===rep.ri)?'':groupHTML(g.name||'Opciones',`data-group-idx="${idx}"`,g.options,modalVariants[idx]||'')
+        ).join('');
+        // Selectores clonados de la plantilla (rep.n copias, "Salsa 1..N").
+        let repeatHTML='';
+        if(rep&&rep.n>0){
+          const base=rep.group.name||'Salsa';
+          for(let k=0;k<rep.n;k++) repeatHTML+=groupHTML(`${base} ${k+1}`,`data-repeat-k="${k}"`,rep.group.options,modalRepeat[k]||'');
+        }
+        variantHTML='<div class="customize-label">Personaliza</div>'+staticHTML+repeatHTML;
       }
 
       $modalDetail.innerHTML=`
@@ -496,6 +520,10 @@
           const label=dist.group.options.filter(o=>modalDist[getOptionKey(o)]>0)
             .map(o=>`${getOptionDisplay(o)} x${modalDist[getOptionKey(o)]}`).join(' · ');
           v={[dist.group.name]:label};
+        } else if(rep&&rep.n>0){
+          v=Object.assign({},modalVariants);
+          const base=rep.group.name||'Salsa';
+          for(let k=0;k<rep.n;k++) v['r'+k]=`${base} ${k+1}: ${modalRepeat[k]}`;
         }
         cartAdd(modalProduct.id,v,modalQty);closeModal();
       });
@@ -506,7 +534,13 @@
       }));
       $modalDetail.querySelectorAll('.variant-option').forEach(btn=>{
         btn.addEventListener('click',()=>{
-          const idx=+btn.dataset.groupIdx,opt=btn.dataset.opt;
+          const opt=btn.dataset.opt;
+          if(btn.dataset.repeatK!==undefined){
+            const k=+btn.dataset.repeatK;
+            if(modalRepeat[k]===opt) delete modalRepeat[k]; else modalRepeat[k]=opt;
+            renderModalDetail();return;
+          }
+          const idx=+btn.dataset.groupIdx;
           if(modalVariants[idx]===opt) delete modalVariants[idx];
           else{
             modalVariants[idx]=opt;
@@ -518,6 +552,11 @@
       });
       $modalDetail.querySelectorAll('.variant-select').forEach(sel=>{
         sel.addEventListener('change',()=>{
+          if(sel.dataset.repeatK!==undefined){
+            const k=+sel.dataset.repeatK;
+            if(sel.value) modalRepeat[k]=sel.value; else delete modalRepeat[k];
+            renderModalDetail();return;
+          }
           const idx=+sel.dataset.groupIdx;
           if(sel.value) modalVariants[idx]=sel.value; else delete modalVariants[idx];
           renderModalDetail();
