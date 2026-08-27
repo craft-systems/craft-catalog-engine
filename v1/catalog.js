@@ -10,7 +10,7 @@
     let searchQuery = '';
     let categorySlugs = [];
 
-    let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, sliderIdx = 0, sliderImages = [];
+    let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, modalCombo = {}, sliderIdx = 0, sliderImages = [];
 
     /* ── DOM REFS ── */
     const $catalog=document.getElementById('catalog'),$searchInput=document.getElementById('searchInput'),
@@ -53,8 +53,25 @@
       return g?{group:g,total:unitCount(p)}:null;
     }
 
+    // Promo NxM (ej. 3x2): grupo con "pick" selectores; se cobra todo menos las "free" opciones
+    // más baratas elegidas. null si el producto no usa el mecanismo (retrocompatible).
+    function comboInfo(p){
+      if(!Array.isArray(p.variantes)) return null;
+      const gi=p.variantes.findIndex(g=>g&&g.pick>0);
+      if(gi<0) return null;
+      const g=p.variantes[gi];
+      const priceOf=lbl=>{const o=(g.options||[]).find(o=>getOptionKey(o)===lbl);return o?(getOptionPrice(o)||0):0;};
+      return {gi,g,pick:g.pick,free:g.free||0,item:g.item||'Opción',priceOf};
+    }
+    // Precio 3x2: suma de las elegidas menos las `free` más baratas.
+    const comboTotal=(ci,labels)=>{
+      const prices=labels.filter(Boolean).map(ci.priceOf).sort((a,b)=>a-b);
+      return prices.slice(ci.free).reduce((s,x)=>s+x,0);
+    };
     function getEffectivePrice(p,variantes){
       if(!variantes||!Object.keys(variantes).length) return parsePrice(p);
+      const ci=comboInfo(p);
+      if(ci) return comboTotal(ci,Array.from({length:ci.pick},(_,k)=>variantes['c'+k]));
       let absolute=null,delta=0;
       if(Array.isArray(p.variantes)){
         for(let i=0;i<p.variantes.length;i++){
@@ -406,7 +423,7 @@
     /* ── PRODUCT MODAL ── */
     function openModal(id){
       const p=products.find(x=>String(x.id)===String(id));if(!p) return;
-      modalProduct=p;modalQty=1;modalVariants={};modalDist={};modalRepeat={};sliderImages=getImages(p);sliderIdx=0;
+      modalProduct=p;modalQty=1;modalVariants={};modalDist={};modalRepeat={};modalCombo={};sliderImages=getImages(p);sliderIdx=0;
       $sliderTrack.innerHTML=sliderImages.length
         ?sliderImages.map(src=>`<div class="slider-slide"><img src="${src}" alt="${p.nombre}" loading="lazy"/></div>`).join('')
         :`<div class="slider-slide"><span class="slider-placeholder">${catIcon((p.categorias||[])[0],p.nombre)}</span></div>`;
@@ -441,10 +458,14 @@
       const distSum=dist?dist.group.options.reduce((s,o)=>s+(modalDist[getOptionKey(o)]||0),0):0;
       const rep=repeatInfo(p);
       if(rep) Object.keys(modalRepeat).forEach(k=>{if(+k>=rep.n) delete modalRepeat[k];}); // recorta si baja N
+      const combo=comboInfo(p);
+      const comboMap=()=>{const m={};if(combo)for(let k=0;k<combo.pick;k++)if(modalCombo[k])m['c'+k]=modalCombo[k];return m;};
       const staticOK=!hasVariants||p.variantes.every((_,i)=>(rep&&i===rep.ri)||modalVariants[i]);
       const repeatOK=!rep||rep.n===0||Array.from({length:rep.n}).every((_,k)=>modalRepeat[k]);
-      const allSelected=!hasVariants||(dist?distSum===dist.total:staticOK&&repeatOK);
-      const effPrice=allSelected&&!dist?getEffectivePrice(p,modalVariants):parsePrice(p);
+      const comboOK=!combo||Array.from({length:combo.pick}).every((_,k)=>modalCombo[k]);
+      const allSelected=!hasVariants||(dist?distSum===dist.total:(combo?comboOK:staticOK&&repeatOK));
+      // El combo muestra precio parcial (suma-menos-baratas) según lo ya elegido.
+      const effPrice=combo?getEffectivePrice(p,comboMap()):(allSelected&&!dist?getEffectivePrice(p,modalVariants):parsePrice(p));
       const canAddModal=stock.canAdd&&allSelected;
 
       let variantHTML='';
@@ -475,6 +496,11 @@
               <div class="variant-options">
                 ${options.map(opt=>{const oKey=getOptionKey(opt);return`<button class="variant-option${cur===oKey?' selected':''}" ${attr} data-opt="${oKey}">${optLabel(opt)}</button>`;}).join('')}
               </div></div>`;
+        if(combo){
+          let comboHTML='';
+          for(let k=0;k<combo.pick;k++) comboHTML+=groupHTML(`${combo.item} ${k+1}`,`data-combo-k="${k}"`,combo.g.options,modalCombo[k]||'');
+          variantHTML='<div class="customize-label">Personaliza</div>'+comboHTML;
+        } else {
         const staticHTML=p.variantes.map((g,idx)=>
           (rep&&idx===rep.ri)?'':groupHTML(g.name||'Opciones',`data-group-idx="${idx}"`,g.options,modalVariants[idx]||'')
         ).join('');
@@ -485,6 +511,7 @@
           for(let k=0;k<rep.n;k++) repeatHTML+=groupHTML(`${base} ${k+1}`,`data-repeat-k="${k}"`,rep.group.options,modalRepeat[k]||'');
         }
         variantHTML='<div class="customize-label">Personaliza</div>'+staticHTML+repeatHTML;
+        }
       }
 
       $modalDetail.innerHTML=`
@@ -496,7 +523,7 @@
         ${stock.badge?`<div><span class="modal-stock-badge ${stock.cls}">${stock.badge}</span></div>`:''}
         ${p.descripcion?`<div class="modal-desc">${p.descripcion}</div>`:''}
         ${variantHTML}
-        ${hasVariants&&!allSelected?`<p class="modal-variant-hint">${dist?`Reparte ${dist.total} — faltan ${dist.total-distSum}`:'Selecciona todas las opciones'}</p>`:''}
+        ${hasVariants&&!allSelected?`<p class="modal-variant-hint">${dist?`Reparte ${dist.total} — faltan ${dist.total-distSum}`:(combo?`Elige ${combo.pick} ${combo.item.toLowerCase()}s`:'Selecciona todas las opciones')}</p>`:''}
         ${!stock.canAdd&&allSelected?'<p class="modal-stock-hint">Producto agotado</p>':''}
         <div class="modal-actions">
           <div class="modal-qty">
@@ -524,6 +551,8 @@
           v=Object.assign({},modalVariants);
           const base=rep.group.name||'Salsa';
           for(let k=0;k<rep.n;k++) v['r'+k]=`${base} ${k+1}: ${modalRepeat[k]}`;
+        } else if(combo){
+          v={};for(let k=0;k<combo.pick;k++) v['c'+k]=modalCombo[k];
         }
         cartAdd(modalProduct.id,v,modalQty);closeModal();
       });
@@ -535,6 +564,11 @@
       $modalDetail.querySelectorAll('.variant-option').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const opt=btn.dataset.opt;
+          if(btn.dataset.comboK!==undefined){
+            const k=+btn.dataset.comboK;
+            if(modalCombo[k]===opt) delete modalCombo[k]; else modalCombo[k]=opt;
+            renderModalDetail();return;
+          }
           if(btn.dataset.repeatK!==undefined){
             const k=+btn.dataset.repeatK;
             if(modalRepeat[k]===opt) delete modalRepeat[k]; else modalRepeat[k]=opt;
@@ -552,6 +586,11 @@
       });
       $modalDetail.querySelectorAll('.variant-select').forEach(sel=>{
         sel.addEventListener('change',()=>{
+          if(sel.dataset.comboK!==undefined){
+            const k=+sel.dataset.comboK;
+            if(sel.value) modalCombo[k]=sel.value; else delete modalCombo[k];
+            renderModalDetail();return;
+          }
           if(sel.dataset.repeatK!==undefined){
             const k=+sel.dataset.repeatK;
             if(sel.value) modalRepeat[k]=sel.value; else delete modalRepeat[k];

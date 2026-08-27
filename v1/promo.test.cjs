@@ -40,4 +40,24 @@ assert.strictEqual(distTotal('Elige tus 3 sabores'), 3);
 assert.strictEqual(distTotal('Elige 2 sabores'), 2);
 assert.strictEqual(distTotal('Sabores'), 1);
 
-console.log('ok — promo day filter + category emoji + dist total');
+// --- precio promo NxM: suma de elegidas menos las `free` más baratas (misma lógica que comboTotal) ---
+const comboTotal = (labels, options, free) => {
+  const priceOf = l => { const o = options.find(o => o.label === l); return o ? (o.price || 0) : 0; };
+  const prices = labels.filter(Boolean).map(priceOf).sort((a, b) => a - b);
+  return prices.slice(free).reduce((s, x) => s + x, 0);
+};
+const cocteles = [
+  { label: 'MOSCOW MULE ($8.99)', price: 8.99 },
+  { label: 'BULLDOG ($8.99)', price: 8.99 },
+  { label: 'MARGARITA ($7.49)', price: 7.49 },
+];
+// 3x2 (free=1): 3 iguales → paga 2
+assert.strictEqual(comboTotal(['MOSCOW MULE ($8.99)', 'BULLDOG ($8.99)', 'MOSCOW MULE ($8.99)'], cocteles, 1), 17.98);
+// 3x2 con una más barata → la barata (7.49) sale gratis, cobra las dos de 8.99
+assert.strictEqual(comboTotal(['MOSCOW MULE ($8.99)', 'BULLDOG ($8.99)', 'MARGARITA ($7.49)'], cocteles, 1), 17.98);
+// parcial (2 de 3 elegidas) → resta la más barata de las elegidas hasta ahora
+assert.strictEqual(comboTotal(['MOSCOW MULE ($8.99)', 'MARGARITA ($7.49)', undefined], cocteles, 1), 8.99);
+// vacío → 0
+assert.strictEqual(comboTotal([undefined, undefined, undefined], cocteles, 1), 0);
+
+console.log('ok — promo day filter + category emoji + dist total + combo NxM price');
