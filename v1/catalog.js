@@ -811,7 +811,7 @@
         `© ${new Date().getFullYear()} <strong>${store}</strong>`+
         `<span class="footer-sep">|</span><a href="#" id="lnkTerms">Términos y condiciones</a>`+
         `<span class="footer-sep">|</span><a href="#" id="lnkPrivacy">Política de privacidad</a>`+
-        `<br><span class="footer-credit">Powered by <a href="https://craftmarketing.agency" target="_blank" rel="noopener">craftmarketing.agency</a></span>`;
+        `<br><span class="footer-credit">Powered by <a href="https://craftmarketing.agency" target="_blank" rel="noopener">Craft Systems</a></span>`;
       if(config.hero_title) document.getElementById('heroTitle').innerHTML=config.hero_title;
 
       // Burbuja de WhatsApp: número dinámico desde config (no hardcodear en el index).
