@@ -72,6 +72,8 @@
       padding:10px 16px;font-size:13px;line-height:1.5;color:var(--text-soft);
     }
     .hero .notice strong{color:var(--accent)}
+    .hero .notice.closed{border-color:var(--out-of-stock);background:color-mix(in srgb,var(--out-of-stock) 12%,transparent)}
+    .hero .notice.closed strong{color:var(--out-of-stock)}
 
     /* ── STICKY SEARCH + CATEGORIES ── */
     .sticky-bar{position:sticky;top:0;z-index:100;padding-top:10px;
@@ -296,6 +298,7 @@
     .cart-item-remove{align-self:flex-start;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,90,90,.14);color:#ff7a7a;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s}
     .cart-item-remove:hover{background:rgba(255,90,90,.26)}
     .cart-footer{padding:16px 24px calc(20px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:var(--surface)}
+    .cart-fee{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;font-size:13px;color:var(--text-soft)}
     .cart-total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
     .cart-total-label{font-size:14px;color:var(--text-soft)}
     .cart-total-value{font-size:26px;font-weight:800}

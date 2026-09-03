@@ -9,6 +9,7 @@
     let activeFilter = 'all';   // 'all' | <slug> | '__offers__' | '__favs__'
     let searchQuery = '';
     let categorySlugs = [];
+    let storeClosed = false;    // fuera de horario (config.hours) → bloquea el checkout, no la navegación
 
     let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, modalCombo = {}, sliderIdx = 0, sliderImages = [];
 
@@ -178,6 +179,33 @@
     function loadCart(){try{const s=JSON.parse(localStorage.getItem('menu_cart')||'[]');if(Array.isArray(s))cartItems=s;}catch(e){}}
     const cartTotalQty=()=>cartItems.reduce((s,i)=>s+i.qty,0);
     const cartTotalPrice=()=>cartItems.reduce((s,i)=>s+i.precio*i.qty,0);
+
+    /* ── HORARIO Y EMPAQUE (opt-in por config; no-op si faltan) ── */
+    // Modo de entrega activo en el checkout (por defecto domicilio; el empaque solo aplica a domicilio).
+    const currentMode=()=>document.querySelector('.dtog-btn.active')?.dataset.mode||'delivery';
+    // Costo de empaque: plano por pedido (per_order, default) o por unidad (per_unit). 0 en retiro o sin config.
+    function packagingFee(mode){
+      const p=config.packaging;
+      if(!p||!p.enabled||mode==='pickup') return 0;
+      const cost=+p.cost||0; if(cost<=0) return 0;
+      return p.mode==='per_unit' ? cost*cartTotalQty() : cost;
+    }
+    // Abierto/cerrado según config.hours.weekly (claves 0=Dom..6=Sáb, convención getDay) en su zona horaria.
+    // Sin config → siempre abierto. ponytail: la cola nocturna (18:00–02:00) cuenta el tramo de esa
+    // misma noche; el tramo 00:00–02:00 se atribuye al día siguiente — si un local lo necesita, se
+    // configura ese rango en el día correspondiente. Suficiente para cierres a las 00:00.
+    function storeHoursOpen(h){
+      if(!h||!h.weekly) return true;
+      let parts;
+      try{ parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:h.tz||'America/Guayaquil',
+        hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value])); }
+      catch(e){ return true; }
+      const day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[parts.weekday];
+      let hh=+parts.hour; if(hh===24) hh=0;
+      const mins=hh*60+(+parts.minute), toMin=s=>{const [a,b]=String(s).split(':');return (+a)*60+(+b||0);};
+      const ranges=h.weekly[day]||[];
+      return ranges.some(r=>{const s=toMin(r[0]),e=toMin(r[1]);return e>s?(mins>=s&&mins<e):(mins>=s||mins<e);});
+    }
 
     /* ── CATEGORY STRIP ── */
     // Orden: config.category_order primero (el sync lo preserva), luego el resto. El sync
@@ -621,14 +649,22 @@
 
     /* ── CART UI ── */
     function updateCartUI(){
-      const qty=cartTotalQty(),total=cartTotalPrice();
+      const qty=cartTotalQty(),fee=packagingFee(currentMode()),total=cartTotalPrice()+fee;
       $navBadge.textContent=qty;$navBadge.classList.toggle('show',qty>0);
       $peekCount.textContent=qty;$peekTotal.textContent=formatPrice(total);
       const sheetOpen=$cartDrawer.classList.contains('open');
       $cartPeek.classList.toggle('show',qty>0&&!sheetOpen);
       $cartTotal.textContent=formatPrice(total);
       $cartItemCount.textContent=`${qty} item(s) · ${cartItems.length} producto(s)`;
-      $btnCheckout.disabled=qty===0;
+      $btnCheckout.disabled=qty===0||storeClosed;
+
+      // Línea de empaque en el footer (creada al vuelo; el HTML del cliente no la trae).
+      let feeLine=document.getElementById('cartFeeLine');
+      const footer=$cartTotal.closest('.cart-footer');
+      if(fee>0&&qty>0){
+        if(!feeLine&&footer){feeLine=document.createElement('div');feeLine.id='cartFeeLine';feeLine.className='cart-fee';footer.insertBefore(feeLine,footer.firstChild);}
+        if(feeLine) feeLine.innerHTML=`<span>${(config.packaging&&config.packaging.label)||'Empaque'}</span><span>${formatPrice(fee)}</span>`;
+      }else if(feeLine){feeLine.remove();}
 
       if(!cartItems.length){
         $cartItems.innerHTML=`<div class="cart-empty"><span class="em">🛒</span><p>Tu pedido está vacío</p></div>`;
@@ -660,6 +696,7 @@
     }
     function goToStep2(){
       if(!cartItems.length) return;
+      if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
       $cartItems.style.display='none';
       document.querySelector('.cart-footer').style.display='none';
       document.getElementById('cartStep2').style.display='flex';
@@ -677,17 +714,22 @@
       const address=mode==='delivery'?document.getElementById('fieldAddress').value.trim():'';
       if(!name||!phone){showToast('Completa tu nombre y teléfono');return;}
       if(mode==='delivery'&&!address){showToast('Ingresa tu dirección de entrega');return;}
-      const total=cartTotalPrice(),cur=config.currency||'$',store=config.store_name||'Catálogo';
+      if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      const fee=packagingFee(mode),cur=config.currency||'$',store=config.store_name||'Catálogo';
+      const total=cartTotalPrice()+fee;
+      const pkgLabel=(config.packaging&&config.packaging.label)||'Empaque';
 
-      // Notifica al dueño antes de abrir WA — fire-and-forget
+      // Notifica al dueño antes de abrir WA — fire-and-forget. El empaque va como ítem extra.
       if(config.catalog_notify_url&&config.catalog_notify_token){
+        const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined}));
+        if(fee>0) notifyItems.push({nombre:pkgLabel,qty:1,precio:fee});
         fetch(config.catalog_notify_url,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
             token:config.catalog_notify_token,
             store_name:store,
-            items:cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined})),
+            items:notifyItems,
             total,currency:cur,
             client_name:name,client_phone:phone,
             delivery_mode:mode,address:address||undefined,
@@ -701,6 +743,7 @@
         const vLabel=variantLabel(item.variantes);
         msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
       });
+      if(fee>0) msg+=`▸ ${pkgLabel}\n  ${formatPrice(fee)}\n`;
       msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
       msg+=`*ENTREGA:* ${mode==='delivery'?'Domicilio':'Retiro en local'}\n`;
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
@@ -777,6 +820,7 @@
       document.querySelectorAll('.dtog-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('fieldAddressWrap').style.display=btn.dataset.mode==='delivery'?'':'none';
+      updateCartUI(); // el empaque solo aplica a domicilio → recalcula total
     });
     $modalOverlay.addEventListener('click',e=>{if(e.target===$modalOverlay) closeModal();});
     $modalClose.addEventListener('click',closeModal);
@@ -828,6 +872,14 @@
         if(md) parts.push(`con <strong>${md} días</strong> de anticipación`);
         const $n=document.getElementById('heroNotice');
         $n.innerHTML=parts.join(', ')+'.';$n.style.display='inline-block';
+      }
+
+      // Horario de atención: fuera de hora se bloquea el checkout (se sigue pudiendo navegar).
+      storeClosed=!storeHoursOpen(config.hours);
+      if(storeClosed){
+        const $n=document.getElementById('heroNotice');
+        $n.innerHTML=`🔴 <strong>Cerrado ahora.</strong> ${(config.hours&&config.hours.closed_msg)||'Vuelve dentro de nuestro horario de atención.'}`;
+        $n.style.display='inline-block';$n.classList.add('closed');
       }
 
       const res=await fetch('productos.json',{cache:'no-store'});
