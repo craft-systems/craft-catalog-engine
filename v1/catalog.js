@@ -666,6 +666,8 @@
         if(feeLine) feeLine.innerHTML=`<span>${(config.packaging&&config.packaging.label)||'Empaque'}</span><span>${formatPrice(fee)}</span>`;
       }else if(feeLine){feeLine.remove();}
 
+      renderCrossSell();
+
       if(!cartItems.length){
         $cartItems.innerHTML=`<div class="cart-empty"><span class="em">🛒</span><p>Tu pedido está vacío</p></div>`;
         return;
@@ -682,6 +684,31 @@
           <button class="cart-item-remove" data-key="${item.key}" title="Quitar">✕</button>
         </div>`;
       }).join('');
+    }
+
+    /* ── CROSS-SELL (opt-in por config.cross_sell; tira de sugeridos en el carrito) ──
+       {categories:[slug],title,max}. Muestra productos de esas categorías que no estén ya
+       en el carrito ni agotados. Tap: simple → agrega; con variantes → abre el modal. */
+    function renderCrossSell(){
+      const cfg=config.cross_sell,cats=cfg&&Array.isArray(cfg.categories)?cfg.categories:[];
+      let box=document.getElementById('crossSell');
+      const footer=$cartTotal.closest('.cart-footer');
+      if(!cats.length||!cartItems.length||!footer){ if(box) box.remove(); return; }
+      const inCart=new Set(cartItems.map(ci=>String(ci.id)));
+      const pool=products.filter(p=>(p.categorias||[]).some(c=>cats.includes(c))&&!inCart.has(String(p.id))&&getStockInfo(p).canAdd);
+      const items=pool.slice(0,cfg.max||6);
+      if(!items.length){ if(box) box.remove(); return; }
+      if(!box){ box=document.createElement('div');box.id='crossSell';box.className='cross-sell';footer.parentNode.insertBefore(box,footer); }
+      box.innerHTML=`<div class="cross-sell-title">${cfg.title||'¿Algo más?'}</div><div class="cross-sell-strip">`+
+        items.map(p=>{
+          const hasV=Array.isArray(p.variantes)&&p.variantes.length>0,img=getImages(p)[0];
+          const price=typeof p.precio==='number'?formatPrice(p.precio):(p.precio||'');
+          return `<button class="xs-card" ${hasV?`data-open="${p.id}"`:`data-add="${p.id}"`} aria-label="Agregar ${p.nombre}">
+            ${img?`<img src="${img}" alt="${p.nombre}" loading="lazy"/>`:`<div class="xs-ph">🍽️</div>`}
+            <div class="xs-name">${p.nombre}</div>
+            <div class="xs-foot"><span class="xs-price">${price}</span><span class="xs-add">+</span></div>
+          </button>`;
+        }).join('')+`</div>`;
     }
     function openCart(){$cartOverlay.classList.add('open');$cartDrawer.classList.add('open');document.body.style.overflow='hidden';setActiveNav('cart');$cartPeek.classList.remove('show');}
     function closeCart(){$cartOverlay.classList.remove('open');$cartDrawer.classList.remove('open');document.body.style.overflow='';syncNavToFilter();updateCartUI();goToStep1();}
