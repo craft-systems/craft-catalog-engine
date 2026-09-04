@@ -72,7 +72,11 @@
     function getEffectivePrice(p,variantes){
       if(!variantes||!Object.keys(variantes).length) return parsePrice(p);
       const ci=comboInfo(p);
-      if(ci) return comboTotal(ci,Array.from({length:ci.pick},(_,k)=>variantes['c'+k]));
+      // pick con opciones sin precio (ej. salsas incluidas) = precio base; con precio = NxM (suma−free).
+      if(ci){
+        const priced=(ci.g.options||[]).some(o=>getOptionPrice(o)!==null);
+        return priced?comboTotal(ci,Array.from({length:ci.pick},(_,k)=>variantes['c'+k])):parsePrice(p);
+      }
       let absolute=null,delta=0;
       if(Array.isArray(p.variantes)){
         for(let i=0;i<p.variantes.length;i++){
