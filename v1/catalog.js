@@ -505,7 +505,7 @@
       if(rep) Object.keys(modalRepeat).forEach(k=>{if(+k>=rep.n) delete modalRepeat[k];}); // recorta si baja N
       const combo=comboInfo(p);
       const comboMap=()=>{const m={};if(combo)for(let k=0;k<combo.pick;k++)if(modalCombo[k])m['c'+k]=modalCombo[k];return m;};
-      const staticOK=!hasVariants||p.variantes.every((_,i)=>(rep&&i===rep.ri)||modalVariants[i]);
+      const staticOK=!hasVariants||p.variantes.every((g,i)=>(rep&&i===rep.ri)||g.optional||modalVariants[i]);
       const repeatOK=!rep||rep.n===0||Array.from({length:rep.n}).every((_,k)=>modalRepeat[k]);
       const comboOK=!combo||Array.from({length:combo.pick}).every((_,k)=>modalCombo[k]);
       const allSelected=!hasVariants||(dist?distSum===dist.total:(combo?comboOK:staticOK&&repeatOK));
