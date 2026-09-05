@@ -458,6 +458,37 @@
     .empty-state .em{font-size:52px;display:block;margin-bottom:14px;opacity:.7}
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 
+    /* ── CLOSED MODAL ── */
+    .closed-overlay{position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
+    .closed-overlay.open{opacity:1;pointer-events:auto}
+    .closed-modal{width:100%;max-width:480px;max-height:90dvh;overflow-y:auto;background:linear-gradient(160deg,var(--bg-2),var(--bg));border:1px solid var(--border);border-bottom:none;border-radius:26px 26px 0 0;padding:28px 24px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;transform:translateY(100%);transition:transform .4s cubic-bezier(.32,.72,0,1)}
+    .closed-overlay.open .closed-modal{transform:none}
+    @media(min-width:641px){
+      .closed-modal{border:1px solid var(--border);border-radius:26px;transform:scale(.94);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+      .closed-overlay.open .closed-modal{transform:none}
+    }
+    .closed-icon{font-size:48px;text-align:center}
+    .closed-title{font-size:clamp(22px,5vw,28px);font-weight:800;text-align:center;line-height:1.1}
+    .closed-msg{font-size:14px;color:var(--text-soft);text-align:center;line-height:1.5}
+    .closed-sub{font-size:13px;color:var(--accent);text-align:center;font-weight:600}
+    .closed-btns{display:flex;flex-direction:column;gap:10px}
+    .btn-closed-browse{width:100%;padding:15px;border:none;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;font:inherit;font-size:15px;font-weight:700;cursor:pointer;transition:transform .18s,filter .18s}
+    .btn-closed-browse:hover{transform:scale(1.01);filter:brightness(1.06)}
+    .btn-closed-reserve{width:100%;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface-2);color:var(--text);font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background .18s,border-color .18s}
+    .btn-closed-reserve:hover{background:var(--surface);border-color:var(--border-2)}
+    .closed-reserve-wrap{padding-top:4px}
+
+    /* ── RESERVATION FORM ── */
+    .reserve-form{display:flex;flex-direction:column;gap:14px}
+    .reserve-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn-reserve-submit{width:100%;padding:14px 16px;background:var(--wa);color:#fff;border:none;border-radius:16px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .2s,filter .2s}
+    .btn-reserve-submit:hover{transform:scale(1.01);filter:brightness(1.05)}
+
+    /* ── LOCATION RESERVE SECTION ── */
+    .location-reserve{margin-top:28px;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+    .reserve-heading{font-size:18px;font-weight:800;margin-bottom:4px}
+    .reserve-subheading{font-size:13px;color:var(--text-soft);margin-bottom:18px}
+
     @media(max-width:600px){
       .grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px}
       .card-body{padding:11px 12px 12px}

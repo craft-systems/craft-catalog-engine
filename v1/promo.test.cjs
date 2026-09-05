@@ -60,4 +60,33 @@ assert.strictEqual(comboTotal(['MOSCOW MULE ($8.99)', 'MARGARITA ($7.49)', undef
 // vacío → 0
 assert.strictEqual(comboTotal([undefined, undefined, undefined], cocteles, 1), 0);
 
-console.log('ok — promo day filter + category emoji + dist total + combo NxM price');
+// --- empaque con categorías exentas (misma lógica que packagingFee) ---
+const packagingFee = (p, cartItems, products) => {
+  if (!p || !p.enabled) return 0;
+  const cost = +p.cost || 0; if (cost <= 0) return 0;
+  const exempt = new Set(p.exempt_categories || []);
+  const billable = exempt.size ? cartItems.filter(i => {
+    const prod = products.find(x => String(x.id) === String(i.id));
+    return !prod || (prod.categorias || []).every(c => !exempt.has(c));
+  }) : cartItems;
+  if (!billable.length) return 0;
+  return p.mode === 'per_unit' ? cost * billable.reduce((s, i) => s + i.qty, 0) : cost;
+};
+const prods = [
+  { id: 1, categorias: ['alitas'] },
+  { id: 2, categorias: ['bebidas'] },
+  { id: 3, categorias: ['pizzas'] },
+];
+const cart = [{ id: 1, qty: 3 }, { id: 2, qty: 2 }, { id: 3, qty: 1 }]; // 4 no-bebida + 2 bebida
+// per_unit sin exención → cuenta todas las unidades (6)
+assert.strictEqual(packagingFee({ enabled: true, cost: 0.25, mode: 'per_unit' }, cart, prods), 1.5);
+// per_unit con bebidas exentas → solo 4 unidades pagan
+assert.strictEqual(packagingFee({ enabled: true, cost: 0.25, mode: 'per_unit', exempt_categories: ['bebidas'] }, cart, prods), 1.0);
+// per_order con ítems que pagan → flat una vez
+assert.strictEqual(packagingFee({ enabled: true, cost: 0.5, mode: 'per_order', exempt_categories: ['bebidas'] }, cart, prods), 0.5);
+// carrito solo de exentos → 0 (ni siquiera el flat per_order)
+assert.strictEqual(packagingFee({ enabled: true, cost: 0.5, mode: 'per_order', exempt_categories: ['bebidas'] }, [{ id: 2, qty: 3 }], prods), 0);
+// deshabilitado → 0
+assert.strictEqual(packagingFee({ enabled: false, cost: 0.25, mode: 'per_unit' }, cart, prods), 0);
+
+console.log('ok — promo day filter + category emoji + dist total + combo NxM price + packaging exempt');

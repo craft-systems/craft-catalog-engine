@@ -188,11 +188,18 @@
     // Modo de entrega activo en el checkout (por defecto domicilio; el empaque solo aplica a domicilio).
     const currentMode=()=>document.querySelector('.dtog-btn.active')?.dataset.mode||'delivery';
     // Costo de empaque: plano por pedido (per_order, default) o por unidad (per_unit). 0 en retiro o sin config.
+    // exempt_categories: ítems cuya categoría esté ahí no pagan empaque (ej. bebidas). Sin la clave = todos pagan.
     function packagingFee(mode){
       const p=config.packaging;
       if(!p||!p.enabled||mode==='pickup') return 0;
       const cost=+p.cost||0; if(cost<=0) return 0;
-      return p.mode==='per_unit' ? cost*cartTotalQty() : cost;
+      const exempt=new Set(p.exempt_categories||[]);
+      const billable=exempt.size?cartItems.filter(i=>{
+        const prod=products.find(x=>String(x.id)===String(i.id));
+        return !prod||(prod.categorias||[]).every(c=>!exempt.has(c));
+      }):cartItems;
+      if(!billable.length) return 0;
+      return p.mode==='per_unit' ? cost*billable.reduce((s,i)=>s+i.qty,0) : cost;
     }
     // Abierto/cerrado según config.hours.weekly (claves 0=Dom..6=Sáb, convención getDay) en su zona horaria.
     // Sin config → siempre abierto. ponytail: la cola nocturna (18:00–02:00) cuenta el tramo de esa
@@ -426,7 +433,13 @@
           <div class="sedes-grid">${allCards}</div>
           ${mapHTML}
           ${socialHTML}
+          <div class="location-reserve">
+            <h3 class="reserve-heading">📅 Haz una reserva</h3>
+            <p class="reserve-subheading">Cuéntanos cuándo vienes y te confirmamos por WhatsApp</p>
+            ${reservationFormHTML()}
+          </div>
         </section>`;
+      setupReserveForm($catalog.querySelector('.location-reserve'));
     }
 
     function updateCardButtons(){
@@ -864,6 +877,77 @@
       }
     });
 
+    /* ── HORARIO CERRADO MODAL + RESERVAS ── */
+    function buildTimeSlots(dayIdx){
+      const weekly=(config.hours&&config.hours.weekly)||{};
+      const ranges=weekly[dayIdx]||[];
+      const toMin=s=>{const[a,b]=String(s).split(':');return(+a)*60+(+b||0);};
+      const fmt=m=>{const hh=Math.floor(m/60)%24,mm=m%60;return`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;};
+      const slots=[];
+      ranges.forEach(r=>{let s=toMin(r[0]),e=toMin(r[1]);if(e<=s)e+=1440;for(let t=s;t<e;t+=30)slots.push(fmt(t%1440));});
+      if(!slots.length)for(let t=480;t<=1320;t+=30)slots.push(fmt(t)); // ponytail: fallback 08:00-22:00 si no hay config de horario
+      return slots;
+    }
+    function reservationFormHTML(){
+      const days=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const weekly=(config.hours&&config.hours.weekly)||{};
+      const configured=Object.entries(weekly).filter(([,r])=>r&&r.length).map(([d])=>+d);
+      const dayOpts=(configured.length?configured:[0,1,2,3,4,5,6]).map(d=>`<option value="${d}">${days[d]}</option>`).join('');
+      return `<div class="reserve-form">
+        <div class="form-field"><label>Nombre y apellido</label>
+          <input type="text" class="res-name" placeholder="Tu nombre completo" autocomplete="name"/></div>
+        <div class="form-field"><label>WhatsApp</label>
+          <input type="tel" class="res-phone" placeholder="Tu número de WhatsApp" autocomplete="tel"/></div>
+        <div class="reserve-row">
+          <div class="form-field"><label>Día</label><select class="res-day">${dayOpts}</select></div>
+          <div class="form-field"><label>Hora</label><select class="res-time"></select></div>
+        </div>
+        <button class="btn-reserve-submit">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Confirmar reserva
+        </button>
+      </div>`;
+    }
+    function setupReserveForm(container){
+      const dayEl=container.querySelector('.res-day'),timeEl=container.querySelector('.res-time');
+      const fillSlots=()=>{const s=buildTimeSlots(+dayEl.value);timeEl.innerHTML=s.map(t=>`<option>${t}</option>`).join('');};
+      dayEl.addEventListener('change',fillSlots);fillSlots();
+      container.querySelector('.btn-reserve-submit').addEventListener('click',()=>{
+        const name=container.querySelector('.res-name').value.trim();
+        const phone=container.querySelector('.res-phone').value.trim();
+        if(!name||!phone){showToast('Completa nombre y WhatsApp');return;}
+        const num=(config.whatsapp_number||'').replace(/\D/g,'');
+        if(!num){showToast('WhatsApp no configurado');return;}
+        const day=dayEl.options[dayEl.selectedIndex].text,time=timeEl.value;
+        const store=config.store_name||'el local';
+        const msg=`¡Hola! Quiero hacer una *reserva* en ${store}:\n\n*Nombre:* ${name}\n*WhatsApp:* ${phone}\n*Día:* ${day}\n*Hora:* ${time}`;
+        window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+      });
+    }
+    function openClosedModal(){
+      if(document.getElementById('closedOverlay')) return;
+      const el=document.createElement('div');
+      el.id='closedOverlay';el.className='closed-overlay';
+      el.innerHTML=`<div class="closed-modal">
+        <div class="closed-icon">🌙</div>
+        <h2 class="closed-title">Estamos cerrados</h2>
+        <p class="closed-msg">${(config.hours&&config.hours.closed_msg)||'Vuelve en nuestro horario de atención.'}</p>
+        <p class="closed-sub">Arma tu pedido ahora — lo despachamos en cuanto abramos 🚀</p>
+        <div class="closed-btns">
+          <button class="btn-closed-browse">Ten mi pedido listo</button>
+          <button class="btn-closed-reserve">📅 Hacer una reserva</button>
+        </div>
+        <div class="closed-reserve-wrap" style="display:none">${reservationFormHTML()}</div>
+      </div>`;
+      document.body.appendChild(el);
+      el.querySelector('.btn-closed-browse').addEventListener('click',()=>el.classList.remove('open'));
+      el.querySelector('.btn-closed-reserve').addEventListener('click',()=>{
+        const w=el.querySelector('.closed-reserve-wrap');w.style.display=w.style.display==='none'?'':'none';
+      });
+      setupReserveForm(el.querySelector('.closed-reserve-wrap'));
+      requestAnimationFrame(()=>el.classList.add('open'));
+    }
+
     /* ── INIT ── */
     async function init(){
       try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){}
@@ -907,11 +991,7 @@
 
       // Horario de atención: fuera de hora se bloquea el checkout (se sigue pudiendo navegar).
       storeClosed=!storeHoursOpen(config.hours);
-      if(storeClosed){
-        const $n=document.getElementById('heroNotice');
-        $n.innerHTML=`🔴 <strong>Cerrado ahora.</strong> ${(config.hours&&config.hours.closed_msg)||'Vuelve dentro de nuestro horario de atención.'}`;
-        $n.style.display='inline-block';$n.classList.add('closed');
-      }
+      if(storeClosed) openClosedModal();
 
       const res=await fetch('productos.json',{cache:'no-store'});
       products=await res.json();
