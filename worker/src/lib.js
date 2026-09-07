@@ -19,15 +19,23 @@ export function render(tpl, cfg, cfgRaw, theme) {
   const primary = cfg.theme_primary || (cfg.theme && cfg.theme.primary) || "#E4801C";
   const accent = cfg.theme_accent || (cfg.theme && cfg.theme.accent) || "#F5B301";
   const store = cfg.store_name || "Catálogo";
+  // Fuentes del cliente (cada menú trae su combinación). Fallback: las genéricas del engine.
+  const fonts = cfg.fonts
+    ? `<link href="${esc(cfg.fonts)}" rel="stylesheet"/>`
+    : `<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>`;
   return tpl
     .replace("<!--TITLE-->", esc(cfg.site_title || store))
     .replace("<!--FAVICON-->", esc(cfg.favicon || ""))
+    .replace("<!--FONTS-->", fonts)
     .replace("<!--VARS-->", `:root{--primary:${esc(primary)};--accent:${esc(accent)}}`)
     .replace("<!--THEME-->", theme) // CSS bespoke del cliente: se inyecta tal cual (confiable)
     .replace("<!--LOGO-->", esc(cfg.logo || ""))
     .replace("<!--BRAND-->", esc(store))
     .replace("<!--BRANDSUB-->", esc(cfg.brand_sub || ""))
+    .replace("<!--DIVIDER-->", cfg.hero_divider ? '<div class="hero-divider"></div>' : "")
+    .replace("<!--KICKER-->", cfg.hero_kicker ? `<p class="hero-kicker">${esc(cfg.hero_kicker)}</p>` : "")
     .replace("<!--HERO-->", cfg.hero_title || "") // hero_title admite HTML (lo pone el operador)
+    .replace("<!--SEARCHPH-->", esc(cfg.search_placeholder || "Busca tu antojo..."))
     .replace("<!--CONFIG-->", `window.__CONFIG__=${jsonInline(cfgRaw)}`);
 }
 
