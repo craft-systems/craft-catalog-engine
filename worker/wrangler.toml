@@ -1,0 +1,19 @@
+name = "craft-menus"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Sirve todos los menús de clientes nuevos desde un solo Worker.
+routes = [
+  { pattern = "*.craft-systems.com/*", zone_name = "craft-systems.com" },
+]
+
+# KV con los datos de cada menú: {slug}:config, {slug}:productos, {slug}:theme, domain:{host}.
+# El id sale de: Cloudflare → Workers & Pages → KV → namespace "MENUS".
+[[kv_namespaces]]
+binding = "MENUS"
+id = "5d6c441b24004512a8d29c1261608f6e"
+
+# Permite importar template.html como string (SSR del shell).
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]

@@ -958,7 +958,10 @@
 
     /* ── INIT ── */
     async function init(){
-      try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){}
+      // Edge (Worker SSR): el config viene inyectado en el HTML → sin fetch, sin flash.
+      // Legacy (Pages estático): cae al fetch de config.json. Retrocompatible.
+      if(window.__CONFIG__){ config=window.__CONFIG__; }
+      else{ try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){} }
 
       // Tema: aplica tokens de config.theme (objeto) + claves legacy theme_primary/accent.
       // El esqueleto (catalog.css) consume estas CSS vars; lo que un token no cubra va en theme.css.
@@ -973,6 +976,9 @@
 
       const store=config.store_name||'Catálogo';
       document.getElementById('brandName').textContent=store;
+      // Logo desde config (shell genérico del Worker edge). Legacy trae el src en el index → no lo pisa si config.logo está vacío.
+      const brandLogo=document.getElementById('brandLogo');
+      if(brandLogo&&config.logo) brandLogo.src=config.logo;
       document.title=config.site_title||store;
       document.getElementById('footerText').innerHTML=
         `© ${new Date().getFullYear()} <strong>${store}</strong>`+
