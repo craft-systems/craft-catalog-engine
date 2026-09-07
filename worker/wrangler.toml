@@ -17,3 +17,4 @@ id = "5d6c441b24004512a8d29c1261608f6e"
 [[rules]]
 type = "Text"
 globs = ["**/*.html"]
+fallthrough = true
