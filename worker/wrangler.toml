@@ -2,10 +2,11 @@ name = "craft-menus"
 main = "src/index.js"
 compatibility_date = "2026-01-01"
 
-# Sirve todos los menús de clientes nuevos desde un solo Worker.
-routes = [
-  { pattern = "*.craft-systems.com/*", zone_name = "craft-systems.com" },
-]
+# Routes: uno específico por menú ({slug}.craft-systems.com/*), creado por el onboarding
+# de craft-crm vía API (CreateMenuRoute). NO declarar routes aquí ni usar wildcard:
+# el wildcard taparía media.craft-systems.com (R2 custom domain) y rutearía toda la media
+# por el Worker (rompe el modelo de costos a escala). Sin `routes` en este toml, `wrangler
+# deploy` no toca los routes creados por API — persisten en la zona.
 
 # KV con los datos de cada menú: {slug}:config, {slug}:productos, {slug}:theme, domain:{host}.
 # El id sale de: Cloudflare → Workers & Pages → KV → namespace "MENUS".
