@@ -987,6 +987,29 @@
         `<br><span class="footer-credit">Powered by <a href="https://craftmarketing.agency" target="_blank" rel="noopener">Craft Systems</a></span>`;
       if(config.hero_title) document.getElementById('heroTitle').innerHTML=config.hero_title;
 
+      // Personalizaciones opcionales desde config (edge y legacy). Si la clave no está,
+      // se respeta lo que traiga el index del cliente (retrocompat). Crea el elemento si falta.
+      const heroTitle=document.getElementById('heroTitle');
+      const beforeHero=el=>{ if(heroTitle) heroTitle.parentNode.insertBefore(el,heroTitle); };
+      if(config.fonts && !document.querySelector(`link[href="${config.fonts}"]`)){
+        const l=document.createElement('link'); l.rel='stylesheet'; l.href=config.fonts; document.head.appendChild(l);
+      }
+      if(config.favicon){
+        let ic=document.querySelector('link[rel="icon"]');
+        if(!ic){ ic=document.createElement('link'); ic.rel='icon'; document.head.appendChild(ic); }
+        ic.href=config.favicon;
+      }
+      if(config.brand_sub){ const bs=document.querySelector('.brand-sub'); if(bs) bs.textContent=config.brand_sub; }
+      if(config.hero_kicker){
+        let k=document.querySelector('.hero-kicker');
+        if(!k){ k=document.createElement('p'); k.className='hero-kicker'; beforeHero(k); }
+        k.textContent=config.hero_kicker;
+      }
+      if(config.hero_divider && !document.querySelector('.hero-divider')){
+        const d=document.createElement('div'); d.className='hero-divider'; beforeHero(d);
+      }
+      if(config.search_placeholder){ const si=document.getElementById('searchInput'); if(si) si.placeholder=config.search_placeholder; }
+
       // Burbuja de WhatsApp: número dinámico desde config (no hardcodear en el index).
       const waFloat=document.querySelector('.wa-float'),waBubble=(config.whatsapp_number||'').replace(/\D/g,'');
       if(waFloat){
