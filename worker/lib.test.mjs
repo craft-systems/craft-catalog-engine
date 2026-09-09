@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { resolveSlug, render, esc, jsonInline } from "./src/lib.js";
+import { resolveSlug, render, esc, jsonInline, sanitizeBrandSub } from "./src/lib.js";
 
 const env = { MENUS: { get: async (k) => (k === "domain:pedidos.pizza.com" ? "pizzaplanet" : null) } };
 
@@ -31,4 +31,12 @@ test("jsonInline neutraliza cierre de script", () => {
 
 test("esc", () => {
   assert.equal(esc('<b>"&'), "&lt;b&gt;&quot;&amp;");
+});
+
+test("sanitizeBrandSub permite solo spans de color de marca", () => {
+  assert.equal(
+    sanitizeBrandSub('<span style="color:#fff">Más</span> <span style="color:var(--primary)">Sabor.</span>'),
+    '<span style="color:#fff">Más</span> <span style="color:var(--primary)">Sabor.</span>',
+  );
+  assert.equal(sanitizeBrandSub('<img src=x onerror=alert(1)>'), '&lt;img src=x onerror=alert(1)&gt;');
 });

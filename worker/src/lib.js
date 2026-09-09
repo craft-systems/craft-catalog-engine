@@ -31,7 +31,7 @@ export function render(tpl, cfg, cfgRaw, theme) {
     .replace("<!--THEME-->", theme) // CSS bespoke del cliente: se inyecta tal cual (confiable)
     .replace("<!--LOGO-->", esc(cfg.logo || ""))
     .replace("<!--BRAND-->", esc(store))
-    .replace("<!--BRANDSUB-->", esc(cfg.brand_sub || ""))
+    .replace("<!--BRANDSUB-->", cfg.brand_sub_html ? sanitizeBrandSub(cfg.brand_sub_html) : esc(cfg.brand_sub || ""))
     .replace("<!--DIVIDER-->", cfg.hero_divider ? '<div class="hero-divider"></div>' : "")
     .replace("<!--KICKER-->", cfg.hero_kicker ? `<p class="hero-kicker">${esc(cfg.hero_kicker)}</p>` : "")
     .replace("<!--HERO-->", cfg.hero_title || "") // hero_title admite HTML (lo pone el operador)
@@ -46,6 +46,20 @@ export function safeParse(s) {
 // esc: escapa para contexto HTML. El config lo edita el operador, pero escapamos por higiene.
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Solo permite spans de color usados por la identidad de marca; cualquier otro HTML
+// se trata como texto. Así brand_sub_html no se convierte en un bypass de XSS.
+export function sanitizeBrandSub(raw) {
+  const token = /<span style="color:(#fff|var\(--primary\))">([^<>]*)<\/span>/g;
+  const parts = String(raw).split(token);
+  if (parts.length === 1 && /[<>]/.test(String(raw))) return esc(raw);
+  let html = "";
+  for (let i = 0; i < parts.length; i += 3) {
+    html += esc(parts[i]);
+    if (i + 2 < parts.length) html += `<span style="color:${parts[i + 1]}">${esc(parts[i + 2])}</span>`;
+  }
+  return html;
 }
 
 // jsonInline: el JSON crudo va dentro de <script>. Neutraliza "</script>" y separadores de línea JS.
