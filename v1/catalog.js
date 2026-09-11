@@ -291,8 +291,10 @@
     function promoBannerHTML(){
       const promos=products.filter(p=>isPromo(p)&&promoActiveToday(p));
       if(!promos.length) return '';
+      const full=config.promo_full_image; // arte ya diseñado: imagen entera, sin overlay del motor
       const slides=promos.map(p=>{
         const img=getImages(p)[0]||'';
+        if(full&&img) return `<div class="promo-slide full" data-open="${p.id}"><img src="${img}" alt="${p.nombre}" loading="lazy"></div>`;
         return `<div class="promo-slide${img?'':' no-img'}" data-open="${p.id}" ${img?`style="background-image:url('${img}')"`:''}>
           <div class="promo-shade"></div>
           <div class="promo-content">
