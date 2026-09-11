@@ -814,10 +814,24 @@
     });
     $cartPeek.addEventListener('click',openCart);
 
+    // Vitrina WhatsApp: abre wa.me con el producto prellenado (config.wa_order).
+    function waQuick(p){
+      const num=(config.whatsapp_number||'').replace(/\D/g,'');if(!num)return;
+      const price=typeof p.precio==='number'?` — ${formatPrice(p.precio)}`:(p.precio?` — ${p.precio}`:'');
+      const msg=`${config.whatsapp_message||'¡Hola! Quiero pedir:'}\n\n• ${p.nombre}${price}`;
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+    }
+
     /* ── EVENT DELEGATION ── */
     document.addEventListener('click',e=>{
       const favBtn=e.target.closest('[data-fav]');
       if(favBtn){e.stopPropagation();toggleFav(favBtn.dataset.fav);return;}
+
+      // Modo vitrina: cualquier botón de producto abre WhatsApp con ese ítem (sin carrito).
+      if(config.wa_order){
+        const t=e.target.closest('[data-add],[data-open]');
+        if(t){const p=products.find(x=>String(x.id)===String(t.dataset.add||t.dataset.open));if(p)waQuick(p);return;}
+      }
 
       const addTrigger=e.target.closest('[data-add]');
       if(addTrigger&&!e.target.closest('[data-action]')){
