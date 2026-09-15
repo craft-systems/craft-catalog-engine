@@ -36,6 +36,8 @@ export function render(tpl, cfg, cfgRaw, theme) {
     .replace("<!--KICKER-->", cfg.hero_kicker ? `<p class="hero-kicker">${esc(cfg.hero_kicker)}</p>` : "")
     .replace("<!--HERO-->", cfg.hero_title || "") // hero_title admite HTML (lo pone el operador)
     .replace("<!--SEARCHPH-->", esc(cfg.search_placeholder || "Busca tu antojo..."))
+    .replace("<!--COVERAGE-->", Array.isArray(cfg.location?.sedes) && cfg.location.sedes.some(s => s?.id && Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.radio_km > 0)
+      ? '<script src="https://craft-catalog-engine.pages.dev/v1/geo.js" defer></script>' : '')
     .replace("<!--CONFIG-->", `window.__CONFIG__=${jsonInline(cfgRaw)}`);
 }
 

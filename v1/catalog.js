@@ -6,6 +6,16 @@
     let favs = [];
     let products = [];
     let config = {};
+    let coverage = null;
+    const geoScriptURL=new URL('geo.js',document.currentScript.src).href;
+    const needsCoverage=()=>Array.isArray(config.location?.sedes)&&config.location.sedes.some(s=>s?.lat!=null&&s?.lng!=null&&Number(s.radio_km)>0);
+    function requireCoverage(){
+      if(!needsCoverage())return true;
+      if(coverage)return coverage.require();
+      showToast('No se pudo comprobar la cobertura. Recarga el menú para reintentar.');return false;
+    }
+    const orderPhone=()=>coverage?coverage.phone():(config.whatsapp_number||'').replace(/\D/g,'');
+    const sedeNote=()=>coverage?coverage.note():'';
     let activeFilter = 'all';   // 'all' | <slug> | '__offers__' | '__favs__'
     let searchQuery = '';
     let categorySlugs = [];
@@ -742,6 +752,7 @@
     }
     function goToStep2(){
       if(!cartItems.length) return;
+      if(!requireCoverage())return;
       if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
       $cartItems.style.display='none';
       document.querySelector('.cart-footer').style.display='none';
@@ -752,7 +763,8 @@
 
     /* ── WHATSAPP CHECKOUT ── */
     function checkout(){
-      const num=(config.whatsapp_number||'').replace(/\D/g,'');
+      if(!requireCoverage())return;
+      const num=orderPhone();
       if(!num){showToast('WhatsApp no configurado');return;}
       const name=document.getElementById('fieldName').value.trim();
       const phone=document.getElementById('fieldPhone').value.trim();
@@ -779,7 +791,9 @@
             total,currency:cur,
             client_name:name,client_phone:phone,
             delivery_mode:mode,address:address||undefined,
-            store_url:location.href
+            store_url:location.href,
+            latitude:coverage?.coordinates?.lat,
+            longitude:coverage?.coordinates?.lng
           })
         }).catch(()=>{});
       }
@@ -794,7 +808,7 @@
       msg+=`*ENTREGA:* ${mode==='delivery'?'Domicilio':'Retiro en local'}\n`;
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
       if(address) msg+=`*Dirección:* ${address}\n`;
-      msg+=`\n${location.href}`;
+      msg+=sedeNote()+`\n${location.href}`;
       window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
     }
 
@@ -818,9 +832,11 @@
 
     // Vitrina WhatsApp: abre wa.me con el producto prellenado (config.wa_order).
     function waQuick(p){
-      const num=(config.whatsapp_number||'').replace(/\D/g,'');if(!num)return;
+      if(!requireCoverage())return;
+      if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      const num=orderPhone();if(!num)return;
       const price=typeof p.precio==='number'?` — ${formatPrice(p.precio)}`:(p.precio?` — ${p.precio}`:'');
-      const msg=`${config.whatsapp_message||'¡Hola! Quiero pedir:'}\n\n• ${p.nombre}${price}`;
+      const msg=`${config.whatsapp_message||'¡Hola! Quiero pedir:'}\n\n• ${p.nombre}${price}`+sedeNote();
       window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
     }
 
@@ -979,6 +995,16 @@
       if(window.__CONFIG__){ config=window.__CONFIG__; }
       else{ try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){} }
 
+      if(needsCoverage()){
+        try{
+          if(!window.CraftGeo)await new Promise((resolve,reject)=>{
+            const script=document.createElement('script');script.src=geoScriptURL;
+            script.onload=resolve;script.onerror=reject;document.head.append(script);
+          });
+          coverage=window.CraftGeo.create(config);
+        }catch{showToast('No se pudo cargar el selector de ubicación. Recarga para reintentar.');}
+      }
+
       // Tema: aplica tokens de config.theme (objeto) + claves legacy theme_primary/accent.
       // El esqueleto (catalog.css) consume estas CSS vars; lo que un token no cubra va en theme.css.
       const root=document.documentElement.style;
@@ -1031,6 +1057,11 @@
       if(waFloat){
         if(waBubble) waFloat.href=`https://wa.me/${waBubble}?text=${encodeURIComponent(config.whatsapp_message||'¡Hola! Quiero hacer un pedido:')}`;
         else waFloat.style.display='none';
+        waFloat.addEventListener('click',e=>{
+          if(!needsCoverage())return;
+          e.preventDefault();if(!requireCoverage())return;
+          const num=orderPhone();if(num)window.open(`https://wa.me/${num}?text=${encodeURIComponent((config.whatsapp_message||'¡Hola! Quiero hacer un pedido:')+sedeNote())}`,'_blank');
+        });
       }
 
       const mu=config.min_units,md=config.min_days_advance;

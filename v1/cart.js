@@ -64,6 +64,14 @@ if(typeof document !== 'undefined'){ (function(){
   'use strict';
   const $ = id => document.getElementById(id);
   const state = { items: [], products: [], config: {}, storageKey: 'craft_cart' };
+  const geoScriptURL = new URL('geo.js', document.currentScript.src).href;
+  let coverage = null;
+  const needsCoverage = () => Array.isArray(state.config.location?.sedes) && state.config.location.sedes.some(s => s?.lat != null && s?.lng != null && Number(s.radio_km) > 0);
+  function requireCoverage(){
+    if(!needsCoverage()) return true;
+    if(coverage) return coverage.require();
+    toast('No se pudo comprobar la cobertura. Recarga para reintentar.'); return false;
+  }
   let toastTimer;
 
   const cur = () => state.config.currency || '$';
@@ -136,6 +144,7 @@ if(typeof document !== 'undefined'){ (function(){
   }
   function step2(){
     if(!state.items.length) return;
+    if(!requireCoverage()) return;
     const s2 = $('cartStep2'); if(!s2){ checkout(); return; }  // sin form → checkout directo
     if($('cartItems')) $('cartItems').style.display = 'none';
     drawer()?.querySelector('.cart-footer')?.style.setProperty('display', 'none');
@@ -145,7 +154,8 @@ if(typeof document !== 'undefined'){ (function(){
   }
 
   function checkout(){
-    const num = (state.config.whatsapp_number || '').replace(/\D/g, '');
+    if(!requireCoverage()) return;
+    const num = coverage ? coverage.phone() : (state.config.whatsapp_number || '').replace(/\D/g, '');
     if(!num){ alert('Número de WhatsApp no configurado'); return; }
     if(!state.items.length) return;
     let fields = null;
@@ -158,7 +168,7 @@ if(typeof document !== 'undefined'){ (function(){
       if(mode === 'delivery' && !address){ toast('Ingresa tu dirección de entrega'); return; }
       fields = { name, phone, mode, address };
     }
-    const msg = buildOrderMessage(state.items, state.config, fields) + `\n${location.href}`;
+    const msg = buildOrderMessage(state.items, state.config, fields) + (coverage ? coverage.note() : '') + `\n${location.href}`;
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
     if(window.dataLayer) window.dataLayer.push({ event: 'whatsapp_checkout', ecommerce: {
       value: cartTotalPrice(state.items), currency: 'USD',
@@ -196,6 +206,15 @@ if(typeof document !== 'undefined'){ (function(){
   function init({ products, config, storageKey } = {}){
     state.products = products || [];
     state.config = config || {};
+    if(needsCoverage()){
+      const ready = () => { coverage = window.CraftGeo.create(state.config); };
+      if(window.CraftGeo) ready();
+      else{
+        const script = document.createElement('script'); script.src = geoScriptURL;
+        script.onload = ready; script.onerror = () => toast('No se pudo cargar la ubicación. Recarga para reintentar.');
+        document.head.append(script);
+      }
+    }
     if(storageKey) state.storageKey = storageKey;
     try{ const s = JSON.parse(localStorage.getItem(state.storageKey) || '[]'); if(Array.isArray(s)) state.items = s; }catch(e){}
     // descarta ítems de productos que ya no existen

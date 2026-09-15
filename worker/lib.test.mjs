@@ -14,6 +14,14 @@ const kv = {
 const env2 = { MENUS: { get: async (k) => (k in kv ? kv[k] : null) } };
 const U = (host, path = "/") => new URL(`https://${host}${path}`);
 
+test('cobertura carga el selector solo para menús con sedes geolocalizadas',()=>{
+  const tpl='<!--COVERAGE--><script><!--CONFIG--></script>';
+  assert.ok(!render(tpl,{},'{}','').includes('/geo.js'));
+  const cfg={location:{sedes:[{id:'norte',nombre:'Norte',lat:0,lng:0,radio_km:2}]}};
+  const result=render(tpl,cfg,JSON.stringify(cfg),'');
+  assert.ok(result.includes('/v1/geo.js'));assert.ok(result.includes('"id":"norte"'));
+});
+
 test("handle: tienda sirve estático desde {slug}:site (/ → /index.html, query ignorada, 404)", async () => {
   const home = await handle(U("demo.craft-systems.com", "/"), env2, "TPL");
   assert.equal(home.status, 200);
