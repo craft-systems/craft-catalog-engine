@@ -6,6 +6,7 @@
 //   node publish-store.mjs --dir ../../pages/plantillas/demo-ropa-elegante --slug demo-ropa
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, extname } from "node:path";
+import { execFileSync } from "node:child_process";
 
 const args = Object.fromEntries(
   process.argv.slice(2).flatMap((v, i, a) => (v.startsWith("--") ? [[v.slice(2), a[i + 1]]] : [])),
@@ -53,8 +54,22 @@ console.log(`wrangler kv key put --local --binding=MENUS "domain:localhost" "${s
 console.log(kv("--local"));
 console.log(`wrangler dev &   # luego: curl -s localhost:8787/ ; curl -s localhost:8787/productos.json`);
 
+// Comprimir imágenes EN LOCAL antes de R2 (recompresión+resize+strip; preserva nombres/formatos
+// → las URLs a R2 no cambian). Solo en onboard desde local; las ediciones por UI van directo a R2.
+console.log(`\n# imágenes optimizadas en local (→ /tmp/${slug}.img):`);
+const imgOut = `/tmp/${slug}.img`;
+const OPT = join(import.meta.dirname, "optimize-images.sh");
+const imgDirs = [];
+for (const sub of ["media", "producto"]) {
+  try {
+    if (!statSync(join(dir, sub)).isDirectory()) continue;
+    process.stdout.write("  " + execFileSync("bash", [OPT, join(dir, sub), `${imgOut}/${sub}`], { encoding: "utf8" }));
+    imgDirs.push(sub);
+  } catch { /* sin esa carpeta: nada que optimizar */ }
+}
+
 console.log(`\n# --- Publicar a PROD (requiere aprobación del operador) ---`);
-console.log(`rclone copy --checksum "${dir}/media"    r2:craft-crm/sites/${slug}/media`);
-console.log(`rclone copy --checksum "${dir}/producto" r2:craft-crm/sites/${slug}/producto`);
+for (const sub of imgDirs)
+  console.log(`rclone copy --checksum "${imgOut}/${sub}" r2:craft-crm/sites/${slug}/${sub}`);
 console.log(kv("--remote"));
 console.log(`# route: POST CF API /workers/routes  pattern=${slug}.craft-systems.com/*  (igual que CreateMenuRoute)`);
