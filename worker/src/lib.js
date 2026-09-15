@@ -62,6 +62,52 @@ export function sanitizeBrandSub(raw) {
   return html;
 }
 
+const jsonType = "application/json;charset=utf-8";
+const ok = (type, body) => ({ status: 200, headers: { "content-type": type, "cache-control": "public, max-age=60" }, body });
+const notFound = () => ({ status: 404, headers: {}, body: "No existe" });
+
+// handle: enruta una petición ya parseada → {status, headers, body} (index.js lo envuelve en
+// Response). Puro salvo por env.MENUS.get → testeable sin el runtime de CF ni el import de HTML.
+export async function handle(url, env, template) {
+  const slug = await resolveSlug(url.hostname, env);
+  if (!slug) return notFound();
+
+  // Datos JSON (comunes a menú y tienda): el app.js del cliente los baja en runtime.
+  if (url.pathname === "/productos.json" || url.pathname === "/config.json") {
+    const key = url.pathname === "/config.json" ? "config" : "productos";
+    const data = await env.MENUS.get(`${slug}:${key}`);
+    return ok(jsonType, data == null ? (key === "productos" ? "[]" : "{}") : data);
+  }
+
+  // Tienda bespoke: HTML/CSS/JS autorado (multi-página) servido estático desde {slug}:site.
+  // Las imágenes NO pasan por aquí — van a R2 (media.craft-systems.com) por URL absoluta.
+  const siteRaw = await env.MENUS.get(`${slug}:site`);
+  if (siteRaw != null) {
+    const file = siteFile(safeParse(siteRaw), url.pathname);
+    return file ? ok(file.type, file.body) : notFound();
+  }
+
+  // Menú config-driven: render del template único con la config del cliente.
+  const cfgRaw = await env.MENUS.get(`${slug}:config`);
+  if (cfgRaw == null) return notFound();
+  const theme = (await env.MENUS.get(`${slug}:theme`)) || "";
+  return ok("text/html;charset=utf-8", render(template, safeParse(cfgRaw), cfgRaw, theme));
+}
+
+// siteFile: elige el archivo del mapa de la tienda para un pathname ("/" → "/index.html").
+export function siteFile(site, pathname) {
+  const path = pathname === "/" ? "/index.html" : pathname;
+  const body = site[path];
+  return body == null ? null : { body, type: contentType(path) };
+}
+
+export function contentType(path) {
+  if (path.endsWith(".css")) return "text/css;charset=utf-8";
+  if (path.endsWith(".js")) return "application/javascript;charset=utf-8";
+  if (path.endsWith(".json")) return jsonType;
+  return "text/html;charset=utf-8";
+}
+
 // jsonInline: el JSON crudo va dentro de <script>. Neutraliza "</script>" y separadores de línea JS.
 export function jsonInline(raw) {
   return raw.replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");

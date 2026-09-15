@@ -1,8 +1,47 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { resolveSlug, render, esc, jsonInline, sanitizeBrandSub } from "./src/lib.js";
+import { resolveSlug, render, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType } from "./src/lib.js";
 
 const env = { MENUS: { get: async (k) => (k === "domain:pedidos.pizza.com" ? "pizzaplanet" : null) } };
+
+// KV con una tienda (demo, tiene :site) y un menú (pizza, solo :config) para probar el ruteo.
+const store = { "/index.html": "<h1>home</h1>", "/pages/productos.html": "<h1>cat</h1>", "/assets/app.js": "x" };
+const kv = {
+  "demo:site": JSON.stringify(store),
+  "demo:productos": '[{"id":"x"}]',
+  "pizza:config": '{"store_name":"Pizza"}',
+};
+const env2 = { MENUS: { get: async (k) => (k in kv ? kv[k] : null) } };
+const U = (host, path = "/") => new URL(`https://${host}${path}`);
+
+test("handle: tienda sirve estático desde {slug}:site (/ → /index.html, query ignorada, 404)", async () => {
+  const home = await handle(U("demo.craft-systems.com", "/"), env2, "TPL");
+  assert.equal(home.status, 200);
+  assert.equal(home.body, "<h1>home</h1>");
+  assert.match(home.headers["content-type"], /text\/html/);
+
+  const js = await handle(U("demo.craft-systems.com", "/assets/app.js?v=2"), env2, "TPL");
+  assert.match(js.headers["content-type"], /javascript/); // content-type por extensión, query ignorada
+
+  const prod = await handle(U("demo.craft-systems.com", "/productos.json"), env2, "TPL");
+  assert.equal(prod.body, '[{"id":"x"}]');
+
+  assert.equal((await handle(U("demo.craft-systems.com", "/nope"), env2, "TPL")).status, 404);
+});
+
+test("handle: sin {slug}:site rutea al render del menú", async () => {
+  const out = await handle(U("pizza.craft-systems.com", "/"), env2, "<title><!--TITLE--></title>");
+  assert.equal(out.status, 200);
+  assert.ok(out.body.includes("Pizza"));       // render inyectó store_name
+  assert.ok(!out.body.includes("<!--TITLE-->"));
+});
+
+test("siteFile / contentType", () => {
+  assert.equal(siteFile(store, "/").body, "<h1>home</h1>");
+  assert.equal(siteFile(store, "/nope"), null);
+  assert.equal(contentType("/a.css"), "text/css;charset=utf-8");
+  assert.equal(contentType("/a.js"), "application/javascript;charset=utf-8");
+});
 
 test("resolveSlug", async () => {
   assert.equal(await resolveSlug("zuba.craft-systems.com", env), "zuba");
