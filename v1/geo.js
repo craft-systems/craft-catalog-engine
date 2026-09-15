@@ -35,7 +35,7 @@
     const loc=config.location||{},sedes=Array.isArray(loc.sedes)?loc.sedes:[],enabled=sedes.some(hasCoverage);
     let active=null,point=null,attempted=false,map=null,pin=null,candidate=null,request=0;
     const outside=loc.out_of_coverage_message||'Aún no cubrimos tu zona 😔';
-    const note=()=>active&&point?`\n*Sede:* ${active.nombre}\n*Dirección de la sede:* ${active.direccion||''}\n[Sede:${active.id};ubicacion:${point.lat},${point.lng}]\n`:'';
+    const note=()=>active&&point?`\n*Sede:* ${active.nombre}\n*Dirección de la sede:* ${active.direccion||''}\n📍 Ubicación del cliente: https://maps.google.com/?q=${point.lat},${point.lng}\n[Sede:${active.id};ubicacion:${point.lat},${point.lng}]\n`:'';
     const api={enabled,get active(){return active;},get coordinates(){return point;},note,
       phone:()=>((active&&active.telefono)||config.whatsapp_number||'').replace(/\D/g,''),require:()=>!enabled||!!active,show:()=>{},select};
     function select(lat,lng){
