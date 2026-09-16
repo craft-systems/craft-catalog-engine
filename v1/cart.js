@@ -168,6 +168,27 @@ if(typeof document !== 'undefined'){ (function(){
       if(mode === 'delivery' && !address){ toast('Ingresa tu dirección de entrega'); return; }
       fields = { name, phone, mode, address };
     }
+    // Notifica al CRM antes de abrir WA — fire-and-forget, mismo contrato que catalog.js (menús).
+    // Gated por config: sin token = solo WhatsApp (comportamiento previo). El endpoint público
+    // persiste el pedido en web_orders + push al operador + aviso WA. Las tiendas lo reciben vía
+    // publishEdge (inyecta catalog_notify_url/token en {slug}:config para kind=store).
+    if(state.config.catalog_notify_url && state.config.catalog_notify_token){
+      fetch(state.config.catalog_notify_url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: state.config.catalog_notify_token,
+          store_name: state.config.store_name || 'Tienda',
+          items: state.items.map(i => ({ nombre: i.nombre, qty: i.qty, precio: i.precio,
+            variant: Object.values(i.variantes || {}).join(' / ') || undefined })),
+          total: cartTotalPrice(state.items),
+          currency: state.config.currency || '$',
+          client_name: fields?.name || '', client_phone: fields?.phone || '',
+          delivery_mode: fields?.mode || 'delivery', address: fields?.address || undefined,
+          store_url: location.href,
+          latitude: coverage?.coordinates?.lat, longitude: coverage?.coordinates?.lng,
+        }),
+      }).catch(() => {});
+    }
     const msg = buildOrderMessage(state.items, state.config, fields) + (coverage ? coverage.note() : '') + `\n${location.href}`;
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
     if(window.dataLayer) window.dataLayer.push({ event: 'whatsapp_checkout', ecommerce: {
