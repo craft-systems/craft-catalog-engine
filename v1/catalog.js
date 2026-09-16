@@ -197,36 +197,52 @@
     /* ── HORARIO Y EMPAQUE (opt-in por config; no-op si faltan) ── */
     // Modo de entrega activo en el checkout (por defecto domicilio; el empaque solo aplica a domicilio).
     const currentMode=()=>document.querySelector('.dtog-btn.active')?.dataset.mode||'delivery';
-    // Costo de empaque: plano por pedido (per_order, default) o por unidad (per_unit). 0 en retiro o sin config.
+    // Costo de empaque: plano por pedido (per_order, default), por unidad (per_unit) o individual
+    // por producto (per_product, usa products[].costo_empaque de cada ítem). 0 en retiro o sin config.
     // exempt_categories: ítems cuya categoría esté ahí no pagan empaque (ej. bebidas). Sin la clave = todos pagan.
     function packagingFee(mode){
       const p=config.packaging;
       if(!p||!p.enabled||mode==='pickup') return 0;
-      const cost=+p.cost||0; if(cost<=0) return 0;
       const exempt=new Set(p.exempt_categories||[]);
+      const prodOf=i=>products.find(x=>String(x.id)===String(i.id));
       const billable=exempt.size?cartItems.filter(i=>{
-        const prod=products.find(x=>String(x.id)===String(i.id));
+        const prod=prodOf(i);
         return !prod||(prod.categorias||[]).every(c=>!exempt.has(c));
       }):cartItems;
       if(!billable.length) return 0;
+      if(p.mode==='per_product') // cada producto paga su propio costo_empaque × cantidad
+        return billable.reduce((s,i)=>s+(+((prodOf(i)||{}).costo_empaque)||0)*i.qty,0);
+      const cost=+p.cost||0; if(cost<=0) return 0;
       return p.mode==='per_unit' ? cost*billable.reduce((s,i)=>s+i.qty,0) : cost;
     }
-    // Abierto/cerrado según config.hours.weekly (claves 0=Dom..6=Sáb, convención getDay) en su zona horaria.
-    // Sin config → siempre abierto. ponytail: la cola nocturna (18:00–02:00) cuenta el tramo de esa
-    // misma noche; el tramo 00:00–02:00 se atribuye al día siguiente — si un local lo necesita, se
-    // configura ese rango en el día correspondiente. Suficiente para cierres a las 00:00.
-    function storeHoursOpen(h){
-      if(!h||!h.weekly) return true;
+    // Calendario local del negocio; incluye la madrugada perteneciente al día anterior.
+    function storeHoursState(h,now=new Date()){
+      if(!h||!h.weekly||!Object.keys(h.weekly).length) return {open:true,preorder:false,next:''};
       let parts;
       try{ parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:h.tz||'America/Guayaquil',
-        hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value])); }
-      catch(e){ return true; }
-      const day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[parts.weekday];
-      let hh=+parts.hour; if(hh===24) hh=0;
-      const mins=hh*60+(+parts.minute), toMin=s=>{const [a,b]=String(s).split(':');return (+a)*60+(+b||0);};
-      const ranges=h.weekly[day]||[];
-      return ranges.some(r=>{const s=toMin(r[0]),e=toMin(r[1]);return e>s?(mins>=s&&mins<e):(mins>=s||mins<e);});
+        hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value])); }
+      catch(e){ return {open:true,preorder:false,next:''}; }
+      const midnight=Date.UTC(+parts.year,+parts.month-1,+parts.day),current=midnight+(+parts.hour*60+ +parts.minute)*60000;
+      const toMin=s=>{if(!/^\d{2}:\d{2}$/.test(s))return NaN;const [a,b]=s.split(':').map(Number);return a<=24&&b<60&&(a!==24||b===0)?a*60+b:NaN;};
+      let open=false,next=Infinity;
+      for(let offset=-1;offset<=7;offset++){
+        const date=new Date(midnight+offset*86400000);
+        for(const r of h.weekly[date.getUTCDay()]||[]){
+          if(!Array.isArray(r)||r.length!==2)continue;
+          const start=toMin(r[0]);let end=toMin(r[1]);
+          if(!Number.isFinite(start)||!Number.isFinite(end)||start===1440)continue;
+          if(end<=start)end+=1440;
+          const a=+date+start*60000,b=+date+end*60000;
+          if(current>=a&&current<b)open=true;
+          if(a>current&&a<next)next=a;
+        }
+      }
+      const nextLabel=Number.isFinite(next)?new Intl.DateTimeFormat('es-EC',{timeZone:'UTC',weekday:'long',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(next)):'';
+      return {open,preorder:!open&&h.allow_preorders===true&&!!nextLabel,next:nextLabel};
     }
+    function storeHoursOpen(h){return storeHoursState(h).open;}
+    function checkoutBlocked(){const s=storeHoursState(config.hours);return !s.open&&!s.preorder;}
+    function preorderNote(){const s=storeHoursState(config.hours);return s.preorder?`Pedido anticipado para la próxima apertura: ${s.next}. Lo despachamos apenas abramos.`:'';}
 
     /* ── CATEGORY STRIP ── */
     // Orden: config.category_order primero (el sync lo preserva), luego el resto. El sync
@@ -753,11 +769,14 @@
     function goToStep2(){
       if(!cartItems.length) return;
       if(!requireCoverage())return;
-      if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
       $cartItems.style.display='none';
       document.querySelector('.cart-footer').style.display='none';
       document.getElementById('cartStep2').style.display='flex';
       document.getElementById('cartTitle').textContent='Datos de entrega';
+      let notice=document.getElementById('preorderNotice');
+      if(!notice){notice=document.createElement('p');notice.id='preorderNotice';document.getElementById('cartStep2').prepend(notice);}
+      notice.textContent=preorderNote();
       document.getElementById('cartBack').style.display='';
     }
 
@@ -772,7 +791,7 @@
       const address=mode==='delivery'?document.getElementById('fieldAddress').value.trim():'';
       if(!name||!phone){showToast('Completa tu nombre y teléfono');return;}
       if(mode==='delivery'&&!address){showToast('Ingresa tu dirección de entrega');return;}
-      if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
       const fee=packagingFee(mode),cur=config.currency||'$',store=config.store_name||'Catálogo';
       const total=cartTotalPrice()+fee;
       const pkgLabel=(config.packaging&&config.packaging.label)||'Empaque';
@@ -799,6 +818,7 @@
       }
 
       let msg=`${config.whatsapp_message||'¡Hola! Quiero hacer un pedido:'}\n\n*PEDIDO — ${store}*\n━━━━━━━━━━━━━━━━━\n`;
+      if(preorderNote())msg+=preorderNote()+'\n';
       cartItems.forEach(item=>{
         const vLabel=variantLabel(item.variantes);
         msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
@@ -833,10 +853,10 @@
     // Vitrina WhatsApp: abre wa.me con el producto prellenado (config.wa_order).
     function waQuick(p){
       if(!requireCoverage())return;
-      if(storeClosed){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
       const num=orderPhone();if(!num)return;
       const price=typeof p.precio==='number'?` — ${formatPrice(p.precio)}`:(p.precio?` — ${p.precio}`:'');
-      const msg=`${config.whatsapp_message||'¡Hola! Quiero pedir:'}\n\n• ${p.nombre}${price}`+sedeNote();
+      const msg=`${config.whatsapp_message||'¡Hola! Quiero pedir:'}\n\n• ${p.nombre}${price}`+sedeNote()+'\n'+preorderNote();
       window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
     }
 
@@ -971,8 +991,8 @@
       el.innerHTML=`<div class="closed-modal">
         <div class="closed-icon">🌙</div>
         <h2 class="closed-title">Estamos cerrados</h2>
-        <p class="closed-msg">${(config.hours&&config.hours.closed_msg)||'Vuelve en nuestro horario de atención.'}</p>
-        <p class="closed-sub">Arma tu pedido ahora — lo despachamos en cuanto abramos 🚀</p>
+        <p class="closed-msg"></p>
+        <p class="closed-sub"></p>
         <div class="closed-btns">
           <button class="btn-closed-browse">Ten mi pedido listo</button>
           <button class="btn-closed-reserve">📅 Hacer una reserva</button>
@@ -980,6 +1000,8 @@
         <div class="closed-reserve-wrap" style="display:none">${reservationFormHTML()}</div>
       </div>`;
       document.body.appendChild(el);
+      el.querySelector('.closed-msg').textContent=(config.hours&&config.hours.closed_msg)||'Vuelve en nuestro horario de atención.';
+      el.querySelector('.closed-sub').textContent=preorderNote()||'Puedes explorar el menú y pedir dentro del horario de atención.';
       el.querySelector('.btn-closed-browse').addEventListener('click',()=>el.classList.remove('open'));
       el.querySelector('.btn-closed-reserve').addEventListener('click',()=>{
         const w=el.querySelector('.closed-reserve-wrap');w.style.display=w.style.display==='none'?'':'none';
