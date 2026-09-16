@@ -44,11 +44,14 @@ test("handle: sin {slug}:site rutea al render del menú", async () => {
   assert.ok(!out.body.includes("<!--TITLE-->"));
 });
 
-test("siteFile / contentType", () => {
+test("siteFile / contentType (con índice de directorio)", () => {
   assert.equal(siteFile(store, "/").body, "<h1>home</h1>");
   assert.equal(siteFile(store, "/nope"), null);
   assert.equal(contentType("/a.css"), "text/css;charset=utf-8");
   assert.equal(contentType("/a.js"), "application/javascript;charset=utf-8");
+  const nested = { "/funnel/x/index.html": "F" };
+  assert.equal(siteFile(nested, "/funnel/x/").body, "F");   // barra final → index.html
+  assert.equal(siteFile(nested, "/funnel/x").body, "F");    // sin extensión → /index.html
 });
 
 test("resolveSlug", async () => {

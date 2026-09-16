@@ -96,9 +96,11 @@ export async function handle(url, env, template) {
   return ok("text/html;charset=utf-8", render(template, safeParse(cfgRaw), cfgRaw, theme));
 }
 
-// siteFile: elige el archivo del mapa de la tienda para un pathname ("/" → "/index.html").
+// siteFile: elige el archivo del mapa de la tienda para un pathname, con índice de directorio
+// (como Pages): "/" y "/dir/" → …/index.html; "/dir" sin extensión → "/dir/index.html".
 export function siteFile(site, pathname) {
-  const path = pathname === "/" ? "/index.html" : pathname;
+  let path = pathname.endsWith("/") ? pathname + "index.html" : pathname;
+  if (site[path] == null && !path.slice(1).includes(".")) path += "/index.html";
   const body = site[path];
   return body == null ? null : { body, type: contentType(path) };
 }
