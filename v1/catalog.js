@@ -543,17 +543,17 @@
 
       let variantHTML='';
       if(dist){
+        // Pills: tap = +1 (repetible) hasta completar el total; badge ×N + "−" para quitar.
         variantHTML='<div class="customize-label">Personaliza</div>'+
           `<div class="variant-group"><div class="variant-glabel">${dist.group.name||'Sabores'} — ${distSum}/${dist.total}</div>`+
+          `<div class="variant-options">`+
           dist.group.options.map(opt=>{
             const k=getOptionKey(opt),c=modalDist[k]||0;
-            return `<div class="dist-row"><span class="dist-name">${getOptionDisplay(opt)}</span>
-              <div class="modal-qty dist-ctrl">
-                <button class="dist-btn" data-dopt="${k}" data-dd="-1" ${c<=0?'disabled':''}>−</button>
-                <span class="qty-val">${c}</span>
-                <button class="dist-btn" data-dopt="${k}" data-dd="1" ${distSum>=dist.total?'disabled':''}>+</button>
-              </div></div>`;
-          }).join('')+`</div>`;
+            return `<button class="variant-option dist-pill${c>0?' selected':''}" data-dopt="${k}" ${(distSum>=dist.total&&c<=0)?'disabled':''}>`+
+              `<span>${getOptionDisplay(opt)}</span>`+
+              (c>0?`<span class="dist-badge">×${c}</span><span class="dist-dec" data-dopt="${k}">−</span>`:'')+
+            `</button>`;
+          }).join('')+`</div></div>`;
       } else if(hasVariants){
         // opt.label already has price embedded (from processVariants price_select) — don't add it again
         const optLabel=opt=>{const d=getOptionDisplay(opt),pr=getOptionPrice(opt);return(pr!==null&&typeof opt==='string')?`${d} (${formatPrice(pr)})`:d;};
@@ -629,13 +629,15 @@
         }
         cartAdd(modalProduct.id,v,modalQty);closeModal();
       });
-      $modalDetail.querySelectorAll('.dist-btn').forEach(btn=>btn.addEventListener('click',()=>{
-        const k=btn.dataset.dopt,dd=+btn.dataset.dd,next=(modalDist[k]||0)+dd;
-        if(next<0||(dd>0&&distSum>=dist.total)) return;
-        modalDist[k]=next;renderModalDetail();
+      $modalDetail.querySelectorAll('.dist-pill').forEach(btn=>btn.addEventListener('click',e=>{
+        const k=btn.dataset.dopt,cur=modalDist[k]||0;
+        if(e.target.closest('.dist-dec')){if(cur>0)modalDist[k]=cur-1;}
+        else if(distSum<dist.total)modalDist[k]=cur+1;
+        renderModalDetail();
       }));
       $modalDetail.querySelectorAll('.variant-option').forEach(btn=>{
         btn.addEventListener('click',()=>{
+          if(btn.classList.contains('dist-pill'))return; // pills de distribute: manejadas arriba
           const opt=btn.dataset.opt;
           if(btn.dataset.comboK!==undefined){
             const k=+btn.dataset.comboK;

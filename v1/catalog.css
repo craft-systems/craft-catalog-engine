@@ -404,9 +404,10 @@
     .variant-select:focus{border-color:var(--accent)}
     .variant-select option{background:var(--bg-2);color:var(--text)}
     .modal-variant-hint{font-size:12px;color:#ff7a7a;margin-top:-6px}
-    .dist-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .dist-name{font-size:14px;font-weight:600}
-    .dist-ctrl{flex:0 0 auto}
+    .dist-pill{display:inline-flex;align-items:center;gap:7px}
+    .dist-pill:disabled{opacity:.4;cursor:default}
+    .dist-badge{font-size:12px;opacity:.95}
+    .dist-dec{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.28);font-weight:800;line-height:1}
     .modal-stock-hint{font-size:12px;color:var(--text-soft);margin-top:-6px}
     .modal-actions{margin-top:6px;display:flex;gap:12px;align-items:stretch}
     .modal-qty{display:flex;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:15px;overflow:hidden}
