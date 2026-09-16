@@ -34,11 +34,13 @@ assert.strictEqual(catLabel('🍽️ Almuerzos'), 'Almuerzos');
 assert.strictEqual(leadingEmoji('Sin Emoji'), '');          // sin emoji → keyword match / name tal cual
 assert.strictEqual(catLabel('Sin Emoji'), 'Sin Emoji');
 
-// --- total de un grupo de distribución = número en el nombre del grupo (misma lógica que distGroup) ---
-const distTotal = groupName => { const m = String(groupName || '').match(/\d+/); return m ? +m[0] : 1; };
-assert.strictEqual(distTotal('Elige tus 3 sabores'), 3);
+// --- total de un grupo de distribución: pick>0 gana; si no, número del nombre; si no, 1 (misma lógica que distGroup) ---
+const distTotal = (groupName, pick = 0) => { if (pick > 0) return pick; const m = String(groupName || '').match(/\d+/); return m ? +m[0] : 1; };
+assert.strictEqual(distTotal('Elige tus 3 sabores'), 3);        // legacy inline BW: total del nombre
 assert.strictEqual(distTotal('Elige 2 sabores'), 2);
 assert.strictEqual(distTotal('Sabores'), 1);
+assert.strictEqual(distTotal('Elige tus salsas', 5), 5);        // grupo reutilizable: pick gana al nombre sin dígito
+assert.strictEqual(distTotal('Elige tus 3 sabores', 5), 5);     // pick gana aunque el nombre tenga dígito
 
 // --- precio promo NxM: suma de elegidas menos las `free` más baratas (misma lógica que comboTotal) ---
 const comboTotal = (labels, options, free) => {

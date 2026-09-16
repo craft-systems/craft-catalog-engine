@@ -56,7 +56,8 @@
     function distGroup(p){
       // Grupo explícito de distribución (elige N repartibles): total = número en el nombre del grupo.
       const dg=(p.variantes||[]).find(g=>g.type==='distribute'&&Array.isArray(g.options)&&g.options.length>1);
-      if(dg){const m=String(dg.name||'').match(/\d+/);return{group:dg,total:m?+m[0]:1};}
+      // total: grupos reutilizables traen `pick` (elige N); los legacy inline lo sacan del nombre ("Elige tus 3").
+      if(dg){const m=String(dg.name||'').match(/\d+/);return{group:dg,total:dg.pick>0?dg.pick:(m?+m[0]:1)};}
       // Alitas: total = cantidad en el nombre del producto ("x N"), categoría alitas/wings.
       if(unitCount(p)<8) return null;
       if(!(p.categorias||[]).some(c=>/alit|wing/i.test(c))) return null;
@@ -543,17 +544,32 @@
 
       let variantHTML='';
       if(dist){
-        // Pills: tap = +1 (repetible) hasta completar el total; badge ×N + "−" para quitar.
-        variantHTML='<div class="customize-label">Personaliza</div>'+
-          `<div class="variant-group"><div class="variant-glabel">${dist.group.name||'Sabores'} — ${distSum}/${dist.total}</div>`+
-          `<div class="variant-options">`+
-          dist.group.options.map(opt=>{
-            const k=getOptionKey(opt),c=modalDist[k]||0;
-            return `<button class="variant-option dist-pill${c>0?' selected':''}" data-dopt="${k}" ${(distSum>=dist.total&&c<=0)?'disabled':''}>`+
-              `<span>${getOptionDisplay(opt)}</span>`+
-              (c>0?`<span class="dist-badge">×${c}</span><span class="dist-dec" data-dopt="${k}">−</span>`:'')+
-            `</button>`;
-          }).join('')+`</div></div>`;
+        const glabel=`<div class="variant-glabel">${dist.group.name||'Sabores'} — ${distSum}/${dist.total}</div>`;
+        // Grupos reutilizables (pick>0) → pills (tap +1 repetible, badge ×N, "−" para quitar).
+        // distribute legacy inline → steppers (BW intacto hasta migrar).
+        if(dist.group.pick>0){
+          variantHTML='<div class="customize-label">Personaliza</div>'+
+            `<div class="variant-group">${glabel}<div class="variant-options">`+
+            dist.group.options.map(opt=>{
+              const k=getOptionKey(opt),c=modalDist[k]||0;
+              return `<button class="variant-option dist-pill${c>0?' selected':''}" data-dopt="${k}" ${(distSum>=dist.total&&c<=0)?'disabled':''}>`+
+                `<span>${getOptionDisplay(opt)}</span>`+
+                (c>0?`<span class="dist-badge">×${c}</span><span class="dist-dec" data-dopt="${k}">−</span>`:'')+
+              `</button>`;
+            }).join('')+`</div></div>`;
+        } else {
+          variantHTML='<div class="customize-label">Personaliza</div>'+
+            `<div class="variant-group">${glabel}`+
+            dist.group.options.map(opt=>{
+              const k=getOptionKey(opt),c=modalDist[k]||0;
+              return `<div class="dist-row"><span class="dist-name">${getOptionDisplay(opt)}</span>
+                <div class="modal-qty dist-ctrl">
+                  <button class="dist-btn" data-dopt="${k}" data-dd="-1" ${c<=0?'disabled':''}>−</button>
+                  <span class="qty-val">${c}</span>
+                  <button class="dist-btn" data-dopt="${k}" data-dd="1" ${distSum>=dist.total?'disabled':''}>+</button>
+                </div></div>`;
+            }).join('')+`</div>`;
+        }
       } else if(hasVariants){
         // opt.label already has price embedded (from processVariants price_select) — don't add it again
         const optLabel=opt=>{const d=getOptionDisplay(opt),pr=getOptionPrice(opt);return(pr!==null&&typeof opt==='string')?`${d} (${formatPrice(pr)})`:d;};
@@ -634,6 +650,11 @@
         if(e.target.closest('.dist-dec')){if(cur>0)modalDist[k]=cur-1;}
         else if(distSum<dist.total)modalDist[k]=cur+1;
         renderModalDetail();
+      }));
+      $modalDetail.querySelectorAll('.dist-btn').forEach(btn=>btn.addEventListener('click',()=>{
+        const k=btn.dataset.dopt,dd=+btn.dataset.dd,next=(modalDist[k]||0)+dd;
+        if(next<0||(dd>0&&distSum>=dist.total)) return;
+        modalDist[k]=next;renderModalDetail();
       }));
       $modalDetail.querySelectorAll('.variant-option').forEach(btn=>{
         btn.addEventListener('click',()=>{

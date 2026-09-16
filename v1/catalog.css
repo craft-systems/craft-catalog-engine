@@ -404,6 +404,9 @@
     .variant-select:focus{border-color:var(--accent)}
     .variant-select option{background:var(--bg-2);color:var(--text)}
     .modal-variant-hint{font-size:12px;color:#ff7a7a;margin-top:-6px}
+    .dist-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .dist-name{font-size:14px;font-weight:600}
+    .dist-ctrl{flex:0 0 auto}
     .dist-pill{display:inline-flex;align-items:center;gap:7px}
     .dist-pill:disabled{opacity:.4;cursor:default}
     .dist-badge{font-size:12px;opacity:.95}
