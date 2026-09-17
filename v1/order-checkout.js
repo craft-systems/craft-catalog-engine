@@ -1,0 +1,55 @@
+/* Registro compartido por menús y tiendas. Solo conserva referencias y hashes en esta pestaña. */
+(function(root){
+  'use strict';
+  const attempts = new Map();
+  let busy = false;
+  async function digest(value){
+    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function register(url, payload){
+    const storageKey = 'craft_order:' + await digest(url + payload.token);
+    const fingerprint = await digest(JSON.stringify(payload));
+    let attempt = attempts.get(storageKey);
+    if(!attempt) try { attempt = JSON.parse(sessionStorage.getItem(storageKey)); } catch {}
+    if(!attempt || attempt.fingerprint !== fingerprint || typeof attempt.key !== 'string'){
+      attempt = { fingerprint, key: crypto.randomUUID() };
+    }
+    attempts.set(storageKey, attempt);
+    try { sessionStorage.setItem(storageKey, JSON.stringify(attempt)); } catch {}
+    // Revalidar también una confirmación guardada: el servidor es la fuente de verdad.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, idempotency_key: attempt.key }), signal: controller.signal });
+      const receipt = await response.json().catch(() => null);
+      if(!response.ok || !receipt || !Number.isSafeInteger(receipt.order_number) || receipt.order_number < 1 || typeof receipt.id !== 'string'){
+        throw new Error(response.status === 409 ? 'Este intento pertenece a otro pedido. Revisa el carrito antes de continuar.' : 'No se pudo confirmar el registro. Reintenta para recuperar tu número de pedido.');
+      }
+      return { ...receipt, reset(){ attempts.delete(storageKey); try { sessionStorage.removeItem(storageKey); } catch {} } };
+    } finally { clearTimeout(timeout); }
+  }
+  async function submit({url, payload, phone, message, container}){
+    if(busy) return;
+    busy = true;
+    document.getElementById('craftOrderReceipt')?.remove();
+    try {
+      const receipt = await register(url, payload);
+      const label = '#' + String(receipt.order_number).padStart(6, '0');
+      const box = document.createElement('section'); box.id = 'craftOrderReceipt';
+      box.setAttribute('role', 'status'); box.style.cssText = 'padding:16px;margin:12px 0;border:1px solid currentColor;border-radius:12px;display:grid;gap:12px';
+      const title = document.createElement('strong'); title.textContent = `Pedido ${label} registrado`;
+      const note = document.createElement('span'); note.textContent = 'Conserva este número. Continúa por WhatsApp para coordinar tu pedido.';
+      const link = document.createElement('a'); link.className = 'btn btn-primary'; link.textContent = 'Continuar por WhatsApp';
+      link.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(`*Pedido ${label}*\n${message}`)}`;
+      link.target = '_blank'; link.rel = 'noopener';
+      const next = document.createElement('button'); next.type = 'button'; next.className = 'btn'; next.textContent = 'Crear otro pedido';
+      next.addEventListener('click', () => { receipt.reset(); box.remove(); });
+      box.append(title, note, link, next); container.append(box); box.scrollIntoView?.({block:'nearest', behavior:'smooth'});
+      return receipt;
+    } finally { busy = false; }
+  }
+  root.CraftOrderCheckout = { register, submit };
+  if(typeof module !== 'undefined') module.exports = root.CraftOrderCheckout;
+})(typeof window !== 'undefined' ? window : globalThis);

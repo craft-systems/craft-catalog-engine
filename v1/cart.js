@@ -64,6 +64,17 @@ if(typeof document !== 'undefined'){ (function(){
   'use strict';
   const $ = id => document.getElementById(id);
   const state = { items: [], products: [], config: {}, storageKey: 'craft_cart' };
+  const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
+  let checkoutBusy = false;
+  async function orderCheckout(){
+    if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
+    await (window.craftOrderLoading ||= new Promise((resolve, reject) => {
+      const script = document.createElement('script'); script.src = orderScriptURL;
+      script.onload = resolve; script.onerror = () => { window.craftOrderLoading = null; script.remove(); reject(new Error('No se pudo cargar el registro. Reintenta.')); };
+      document.head.append(script);
+    }));
+    return window.CraftOrderCheckout;
+  }
   const geoScriptURL = new URL('geo.js', document.currentScript.src).href;
   let coverage = null;
   const needsCoverage = () => Array.isArray(state.config.location?.sedes) && state.config.location.sedes.some(s => s?.lat != null && s?.lng != null && Number(s.radio_km) > 0);
@@ -153,7 +164,8 @@ if(typeof document !== 'undefined'){ (function(){
     if($('cartBack')) $('cartBack').style.display = '';
   }
 
-  function checkout(){
+  async function checkout(){
+      if(checkoutBusy) return;
     if(!requireCoverage()) return;
     const num = coverage ? coverage.phone() : (state.config.whatsapp_number || '').replace(/\D/g, '');
     if(!num){ alert('Número de WhatsApp no configurado'); return; }
@@ -168,33 +180,38 @@ if(typeof document !== 'undefined'){ (function(){
       if(mode === 'delivery' && !address){ toast('Ingresa tu dirección de entrega'); return; }
       fields = { name, phone, mode, address };
     }
-    // Notifica al CRM antes de abrir WA — fire-and-forget, mismo contrato que catalog.js (menús).
-    // Gated por config: sin token = solo WhatsApp (comportamiento previo). El endpoint público
-    // persiste el pedido en web_orders + push al operador + aviso WA. Las tiendas lo reciben vía
-    // publishEdge (inyecta catalog_notify_url/token en {slug}:config para kind=store).
-    if(state.config.catalog_notify_url && state.config.catalog_notify_token){
-      fetch(state.config.catalog_notify_url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: state.config.catalog_notify_token,
-          store_name: state.config.store_name || 'Tienda',
-          items: state.items.map(i => ({ nombre: i.nombre, qty: i.qty, precio: i.precio,
-            variant: Object.values(i.variantes || {}).join(' / ') || undefined })),
-          total: cartTotalPrice(state.items),
-          currency: state.config.currency || '$',
-          client_name: fields?.name || '', client_phone: fields?.phone || '',
-          delivery_mode: fields?.mode || 'delivery', address: fields?.address || undefined,
-          store_url: location.href,
-          latitude: coverage?.coordinates?.lat, longitude: coverage?.coordinates?.lng,
-        }),
-      }).catch(() => {});
-    }
+    const payload = {
+      token: state.config.catalog_notify_token, store_name: state.config.store_name || 'Tienda',
+      items: state.items.map(i => ({ nombre: i.nombre, qty: i.qty, precio: i.precio,
+        variant: Object.values(i.variantes || {}).map(variantOptDisplay).join(' / ') || undefined })),
+      total: cartTotalPrice(state.items), currency: state.config.currency || '$',
+      client_name: fields?.name || '', client_phone: fields?.phone || '', delivery_mode: fields?.mode || 'delivery',
+      address: fields?.address || undefined, store_url: location.href,
+      latitude: coverage?.coordinates?.lat, longitude: coverage?.coordinates?.lng,
+    };
     const msg = buildOrderMessage(state.items, state.config, fields) + (coverage ? coverage.note() : '') + `\n${location.href}`;
+      if(state.config.catalog_notify_url && state.config.catalog_notify_token){
+        checkoutBusy = true;
+        const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
+        const label = button?.textContent;
+        if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
+        try {
+          const checkout = await orderCheckout();
+          await checkout.submit({url:state.config.catalog_notify_url,payload,phone:num,message:msg,
+            container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body});
+          trackCheckout();
+        } catch(error) { toast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
+        finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
+        return;
+      }
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+    trackCheckout();
+    function trackCheckout(){
     if(window.dataLayer) window.dataLayer.push({ event: 'whatsapp_checkout', ecommerce: {
       value: cartTotalPrice(state.items), currency: 'USD',
       items: state.items.map(i => ({ item_id: i.id, item_name: i.nombre, quantity: i.qty, price: i.precio }))
     }});
+    }
   }
 
   // delegación de eventos genéricos (markup bespoke, handlers genéricos)

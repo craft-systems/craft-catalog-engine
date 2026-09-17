@@ -1,3 +1,4 @@
 CLAUDE.md
 worker/.wrangler/
 node_modules/
+graphify-out/

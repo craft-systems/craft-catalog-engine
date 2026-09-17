@@ -7,6 +7,17 @@
     let products = [];
     let config = {};
     let coverage = null;
+  const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
+  let checkoutBusy = false;
+  async function orderCheckout(){
+    if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
+    await (window.craftOrderLoading ||= new Promise((resolve, reject) => {
+      const script = document.createElement('script'); script.src = orderScriptURL;
+      script.onload = resolve; script.onerror = () => { window.craftOrderLoading = null; script.remove(); reject(new Error('No se pudo cargar el registro. Reintenta.')); };
+      document.head.append(script);
+    }));
+    return window.CraftOrderCheckout;
+  }
     const geoScriptURL=new URL('geo.js',document.currentScript.src).href;
     const needsCoverage=()=>Array.isArray(config.location?.sedes)&&config.location.sedes.some(s=>s?.lat!=null&&s?.lng!=null&&Number(s.radio_km)>0);
     function requireCoverage(){
@@ -319,6 +330,7 @@
       const promos=products.filter(p=>isPromo(p)&&promoActiveToday(p));
       if(!promos.length) return '';
       const full=config.promo_full_image; // arte ya diseñado: imagen entera, sin overlay del motor
+      const ctaText=config.promo_cta_text||'Ver oferta';
       const slides=promos.map(p=>{
         const img=getImages(p)[0]||'';
         if(full&&img) return `<div class="promo-slide full" data-open="${p.id}"><img src="${img}" alt="${p.nombre}" loading="lazy"></div>`;
@@ -326,7 +338,7 @@
           <div class="promo-shade"></div>
           <div class="promo-content">
             <div class="promo-title">${p.nombre}</div>
-            <div class="promo-cta">Ver oferta <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><polyline points="9 18 15 12 9 6"/></svg></div>
+            <div class="promo-cta">${ctaText} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><polyline points="9 18 15 12 9 6"/></svg></div>
           </div>
         </div>`;
       }).join('');
@@ -804,7 +816,8 @@
     }
 
     /* ── WHATSAPP CHECKOUT ── */
-    function checkout(){
+    async function checkout(){
+      if(checkoutBusy) return;
       if(!requireCoverage())return;
       const num=orderPhone();
       if(!num){showToast('WhatsApp no configurado');return;}
@@ -819,26 +832,11 @@
       const total=cartTotalPrice()+fee;
       const pkgLabel=(config.packaging&&config.packaging.label)||'Empaque';
 
-      // Notifica al dueño antes de abrir WA — fire-and-forget. El empaque va como ítem extra.
-      if(config.catalog_notify_url&&config.catalog_notify_token){
-        const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined}));
-        if(fee>0) notifyItems.push({nombre:pkgLabel,qty:1,precio:fee});
-        fetch(config.catalog_notify_url,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            token:config.catalog_notify_token,
-            store_name:store,
-            items:notifyItems,
-            total,currency:cur,
-            client_name:name,client_phone:phone,
-            delivery_mode:mode,address:address||undefined,
-            store_url:location.href,
-            latitude:coverage?.coordinates?.lat,
-            longitude:coverage?.coordinates?.lng
-          })
-        }).catch(()=>{});
-      }
+      const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined}));
+      if(fee>0) notifyItems.push({nombre:pkgLabel,qty:1,precio:fee});
+      const payload={ token:config.catalog_notify_token, store_name:store, items:notifyItems,
+        total,currency:cur,client_name:name,client_phone:phone,delivery_mode:mode,address:address||undefined,
+        store_url:location.href,latitude:coverage?.coordinates?.lat,longitude:coverage?.coordinates?.lng };
 
       let msg=`${config.whatsapp_message||'¡Hola! Quiero hacer un pedido:'}\n\n*PEDIDO — ${store}*\n━━━━━━━━━━━━━━━━━\n`;
       if(preorderNote())msg+=preorderNote()+'\n';
@@ -852,6 +850,19 @@
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
       if(address) msg+=`*Dirección:* ${address}\n`;
       msg+=sedeNote()+`\n${location.href}`;
+      if(config.catalog_notify_url && config.catalog_notify_token){
+        checkoutBusy = true;
+        const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
+        const label = button?.textContent;
+        if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
+        try {
+          const checkout = await orderCheckout();
+          await checkout.submit({url:config.catalog_notify_url,payload,phone:num,message:msg,
+            container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body});
+        } catch(error) { showToast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
+        finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
+        return;
+      }
       window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
     }
 
