@@ -160,6 +160,10 @@ if(typeof document !== 'undefined'){ (function(){
     if($('cartItems')) $('cartItems').style.display = 'none';
     drawer()?.querySelector('.cart-footer')?.style.setProperty('display', 'none');
     s2.style.display = 'flex';
+    // El motor no trae CSS propio (cada shell pone el suyo): sin declarar la
+    // dirección, flex queda en `row` y los campos del paso 2 salen en fila
+    // horizontal. catalog.css lo declara; los shells de tienda no.
+    s2.style.flexDirection = 'column';
     if($('cartTitle')) $('cartTitle').textContent = 'Datos de entrega';
     if($('cartBack')) $('cartBack').style.display = '';
   }
