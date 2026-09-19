@@ -214,7 +214,7 @@
     // exempt_categories: ítems cuya categoría esté ahí no pagan empaque (ej. bebidas). Sin la clave = todos pagan.
     function packagingFee(mode){
       const p=config.packaging;
-      if(!p||!p.enabled||mode==='pickup') return 0;
+      if(!p||!p.enabled||mode==='mesa') return 0; // envase se cobra en domicilio y retiro; mesa no lleva empaque
       const exempt=new Set(p.exempt_categories||[]);
       const prodOf=i=>products.find(x=>String(x.id)===String(i.id));
       const billable=exempt.size?cartItems.filter(i=>{
@@ -846,7 +846,7 @@
       });
       if(fee>0) msg+=`▸ ${pkgLabel}\n  ${formatPrice(fee)}\n`;
       msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
-      msg+=`*ENTREGA:* ${mode==='delivery'?'Domicilio':'Retiro en local'}\n`;
+      msg+=`*ENTREGA:* ${mode==='delivery'?'Domicilio':mode==='mesa'?'Mesa':'Retiro en local'}\n`;
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
       if(address) msg+=`*Dirección:* ${address}\n`;
       msg+=sedeNote()+`\n${location.href}`;
@@ -950,7 +950,7 @@
       document.querySelectorAll('.dtog-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('fieldAddressWrap').style.display=btn.dataset.mode==='delivery'?'':'none';
-      updateCartUI(); // el empaque solo aplica a domicilio → recalcula total
+      updateCartUI(); // mesa exime empaque → recalcula total
     });
     $modalOverlay.addEventListener('click',e=>{if(e.target===$modalOverlay) closeModal();});
     $modalClose.addEventListener('click',closeModal);
