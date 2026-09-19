@@ -82,7 +82,9 @@
     // más baratas elegidas. null si el producto no usa el mecanismo (retrocompatible).
     function comboInfo(p){
       if(!Array.isArray(p.variantes)) return null;
-      const gi=p.variantes.findIndex(g=>g&&g.pick>0);
+      // Excluye distribute: un grupo distribute con pick>0 (ej. "elige N salsas") NO es un combo
+      // NxM. Sin esta guarda, effPrice tomaba la rama combo y perdía el recargo de las opciones.
+      const gi=p.variantes.findIndex(g=>g&&g.pick>0&&g.type!=='distribute');
       if(gi<0) return null;
       const g=p.variantes[gi];
       const priceOf=lbl=>{const o=(g.options||[]).find(o=>getOptionKey(o)===lbl);return o?(getOptionPrice(o)||0):0;};
