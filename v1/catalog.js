@@ -62,6 +62,8 @@
     const getOptionPrice=o=>(typeof o==='object'&&o!==null&&typeof o.price==='number')?o.price:null;
     // Recargo aditivo embebido en el nombre: "... +$1", "... +$0.25". Suma sobre la base.
     const getOptionDelta=o=>{const m=String(getOptionDisplay(o)).match(/\+\s*\$\s*([0-9]+(?:[.,][0-9]+)?)/);return m?parseFloat(m[1].replace(',','.')):0;};
+    // Suma de recargos "+$X" de las opciones repartidas (distribute), ponderada por su cantidad.
+    const distDeltaOf=(group,counts)=>(group.options||[]).reduce((s,o)=>s+(counts[getOptionKey(o)]||0)*getOptionDelta(o),0);
     // ponytail: alitas/wings con >=8 uds y >1 salsa → repartir cantidad por salsa. Total sale del nombre ("x 8", "x20").
     const unitCount=p=>{const m=(p.nombre||'').match(/x\s*(\d+)/i);return m?+m[1]:0;};
     function distGroup(p){
@@ -93,6 +95,8 @@
     };
     function getEffectivePrice(p,variantes){
       if(!variantes||!Object.keys(variantes).length) return parsePrice(p);
+      // Selección con precio ya resuelto (ej. distribute con salsas premium) → úsalo tal cual.
+      for(const val of Object.values(variantes)) if(val&&typeof val==='object'&&val.price!=null) return Number(val.price);
       const ci=comboInfo(p);
       // pick con opciones sin precio (ej. salsas incluidas) = precio base; con precio = NxM (suma−free).
       if(ci){
@@ -551,7 +555,7 @@
       const comboOK=!combo||Array.from({length:combo.pick}).every((_,k)=>modalCombo[k]);
       const allSelected=!hasVariants||(dist?distSum===dist.total:(combo?comboOK:staticOK&&repeatOK));
       // El combo muestra precio parcial (suma-menos-baratas) según lo ya elegido.
-      const effPrice=combo?getEffectivePrice(p,comboMap()):(allSelected&&!dist?getEffectivePrice(p,modalVariants):parsePrice(p));
+      const effPrice=combo?getEffectivePrice(p,comboMap()):(dist?parsePrice(p)+distDeltaOf(dist.group,modalDist):(allSelected?getEffectivePrice(p,modalVariants):parsePrice(p)));
       const canAddModal=stock.canAdd&&allSelected;
 
       let variantHTML='';
@@ -647,7 +651,7 @@
         if(dist){
           const label=dist.group.options.filter(o=>modalDist[getOptionKey(o)]>0)
             .map(o=>`${getOptionDisplay(o)} x${modalDist[getOptionKey(o)]}`).join(' · ');
-          v={[dist.group.name]:label};
+          v={[dist.group.name]:{label,price:parsePrice(p)+distDeltaOf(dist.group,modalDist)}};
         } else if(rep&&rep.n>0){
           v=Object.assign({},modalVariants);
           const base=rep.group.name||'Salsa';
