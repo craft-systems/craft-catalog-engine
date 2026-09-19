@@ -66,6 +66,10 @@ export function sanitizeBrandSub(raw) {
 
 const jsonType = "application/json;charset=utf-8";
 const ok = (type, body) => ({ status: 200, headers: { "content-type": type, "cache-control": "public, max-age=60" }, body });
+// HTML del menú: no-cache (revalida siempre) para que la página siempre referencie la versión
+// vigente del motor (catalog.js?v=...). Sin esto, un HTML cacheado apunta a un catalog.js viejo
+// y el cliente no recibe fixes del motor hasta que expire la caché.
+const okHtml = (body) => ({ status: 200, headers: { "content-type": "text/html;charset=utf-8", "cache-control": "no-cache, must-revalidate" }, body });
 const notFound = () => ({ status: 404, headers: {}, body: "No existe" });
 
 // handle: enruta una petición ya parseada → {status, headers, body} (index.js lo envuelve en
@@ -93,7 +97,7 @@ export async function handle(url, env, template) {
   const cfgRaw = await env.MENUS.get(`${slug}:config`);
   if (cfgRaw == null) return notFound();
   const theme = (await env.MENUS.get(`${slug}:theme`)) || "";
-  return ok("text/html;charset=utf-8", render(template, safeParse(cfgRaw), cfgRaw, theme));
+  return okHtml(render(template, safeParse(cfgRaw), cfgRaw, theme));
 }
 
 // siteFile: elige el archivo del mapa de la tienda para un pathname, con índice de directorio
