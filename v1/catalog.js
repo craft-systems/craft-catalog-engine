@@ -124,8 +124,10 @@
       const d=Math.abs(n)<10?2:(Number.isInteger(n)?0:2);
       return c+n.toFixed(d);
     }
-    const cartKey=(id,v)=>(!v||!Object.keys(v).length)?String(id):id+':'+Object.entries(v).sort().map(([k,x])=>k+'='+x).join(',');
-    const variantLabel=v=>(!v||!Object.keys(v).length)?'':Object.entries(v).map(([,x])=>x).join(' · ');
+    // distribute guarda la variante como objeto {label,price}; extraer el texto o coacciona a "[object Object]".
+    const vDisp=x=>(x&&typeof x==='object')?(x.label||x.name||''):(x??'');
+    const cartKey=(id,v)=>(!v||!Object.keys(v).length)?String(id):id+':'+Object.entries(v).sort().map(([k,x])=>k+'='+vDisp(x)).join(',');
+    const variantLabel=v=>(!v||!Object.keys(v).length)?'':Object.entries(v).map(([,x])=>vDisp(x)).filter(Boolean).join(' · ');
 
     function getStockInfo(p){
       if(p.stock===0) return {badge:'Agotado',cls:'sold-out',canAdd:false,maxQty:0};
