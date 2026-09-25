@@ -92,6 +92,22 @@
 
     .cat-strip{display:flex;gap:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 2px 4px}
     .cat-strip::-webkit-scrollbar{display:none}
+    /* Riel con flechas: solo se activa cuando las categorías NO caben (móvil). */
+    .cat-rail{position:relative}
+    .cat-rail.cat-nav-on{padding:0 34px}
+    .cat-nav{
+      display:none;position:absolute;top:50%;margin-top:-17px;z-index:6;
+      width:34px;height:34px;padding:0;border:none;border-radius:50%;cursor:pointer;
+      background:var(--surface-2);color:var(--text);backdrop-filter:blur(10px);
+      align-items:center;justify-content:center;
+      box-shadow:0 4px 14px rgba(0,0,0,.26);transition:transform .18s,opacity .18s;
+    }
+    .cat-rail.cat-nav-on .cat-nav{display:flex}
+    .cat-nav.prev{left:0}.cat-nav.next{right:0}
+    .cat-nav svg{width:17px;height:17px}
+    .cat-nav:hover:not(:disabled){transform:scale(1.09)}
+    .cat-nav:disabled{opacity:.26;cursor:default}
+    .cat-nav:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     .cat-chip{
       flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:7px;
       background:none;border:none;cursor:pointer;width:70px;

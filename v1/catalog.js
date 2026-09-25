@@ -293,6 +293,38 @@
         html+=`<button class="cat-chip" data-cat="${slug}"><span class="ic">${catIcon(slug,name)}</span><span class="lb">${catLabel(name)}</span></button>`;
       });
       $catStrip.innerHTML=html;
+      setupCatNav();
+    }
+    // Flechas del riel de categorías: se muestran SOLO si las categorías no caben
+    // (típicamente móvil). Aditivo: en escritorio el riel cabe entero y no cambia nada.
+    function setupCatNav(){
+      const parent=$catStrip.parentElement;
+      if(!parent||parent.classList.contains('cat-rail')) return;
+      const rail=document.createElement('div');
+      rail.className='cat-rail';
+      parent.insertBefore(rail,$catStrip);
+      rail.appendChild($catStrip);
+      const arrow=(cls,dir,label,pts)=>
+        `<button class="cat-nav ${cls}" type="button" aria-label="${label}" data-dir="${dir}">`+
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" `+
+        `stroke-linecap="round" stroke-linejoin="round"><polyline points="${pts}"/></svg></button>`;
+      rail.insertAdjacentHTML('afterbegin',arrow('prev',-1,'Categorías anteriores','15 18 9 12 15 6'));
+      rail.insertAdjacentHTML('beforeend',arrow('next',1,'Más categorías','9 18 15 12 9 6'));
+      const prev=rail.querySelector('.cat-nav.prev'),next=rail.querySelector('.cat-nav.next');
+      const sync=()=>{
+        const max=$catStrip.scrollWidth-$catStrip.clientWidth;
+        rail.classList.toggle('cat-nav-on',max>8);
+        prev.disabled=$catStrip.scrollLeft<=3;
+        next.disabled=$catStrip.scrollLeft>=max-3;
+      };
+      rail.querySelectorAll('.cat-nav').forEach(b=>b.addEventListener('click',()=>{
+        const step=Math.max(160,$catStrip.clientWidth*.7);
+        $catStrip.scrollBy({left:+b.dataset.dir*step,behavior:'smooth'});
+        setTimeout(sync,380);
+      }));
+      $catStrip.addEventListener('scroll',sync,{passive:true});
+      window.addEventListener('resize',sync);
+      sync();
     }
     function setActiveChip(cat){
       $catStrip.querySelectorAll('.cat-chip').forEach(c=>c.classList.toggle('active',c.dataset.cat===cat));
