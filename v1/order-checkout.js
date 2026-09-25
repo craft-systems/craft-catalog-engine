@@ -42,7 +42,7 @@
       const title = document.createElement('strong'); title.textContent = `Pedido ${label} registrado`;
       const note = document.createElement('span'); note.textContent = 'Conserva este número. Continúa por WhatsApp para coordinar tu pedido.';
       const link = document.createElement('a'); link.className = 'btn btn-primary'; link.textContent = 'Continuar por WhatsApp';
-      link.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(`*Pedido ${label}*\n${message}`)}`;
+      link.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(`*Pedido ${label}*\n[CraftOrder:${receipt.id}]\n${message}`)}`;
       link.target = '_blank'; link.rel = 'noopener';
       const next = document.createElement('button'); next.type = 'button'; next.className = 'btn'; next.textContent = 'Crear otro pedido';
       next.addEventListener('click', () => { receipt.reset(); box.remove(); });

@@ -126,12 +126,14 @@ test('order-checkout: onSuccess solo tras registro confirmado y su fallo no romp
   const {ctx, run} = env({fetch: async () => ok ? {ok: true, status: 200, json: async () => ({id: 'abc', order_number: 5})} : {ok: false, status: 503, json: async () => ({})}});
   run('order-checkout.js');
   const hits = [];
-  const args = onSuccess => ({url: '/o', payload: {token: 't', items: [], total: 5}, phone: '099', message: 'm', container: el(), onSuccess});
+  const containers = [];
+  const args = onSuccess => { const container = el(); containers.push(container); return {url: '/o', payload: {token: 't', items: [], total: 5}, phone: '099', message: 'm', container, onSuccess}; };
   await assert.rejects(ctx.CraftOrderCheckout.submit(args(r => hits.push(r))));
   assert.equal(hits.length, 0);
   ok = true;
   await ctx.CraftOrderCheckout.submit(args(r => hits.push(r)));
   assert.equal(hits[0].id, 'abc');
+  assert.match(decodeURIComponent(containers[1].children[0].children[2].href), /\[CraftOrder:abc\]/);
   const receipt = await ctx.CraftOrderCheckout.submit(args(() => { throw new Error('pixel roto'); }));
   assert.equal(receipt.order_number, 5);
 });
