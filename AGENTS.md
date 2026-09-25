@@ -42,6 +42,15 @@ Purchase→`CompletePayment`; GTM recibe nombres GA4 (`view_item`, `add_to_cart`
 Fuente de verdad: **Integraciones del negocio en craft-crm** (`business_integrations`). Cada sync reescribe
 `tracking` en KV desde ahí y lo **borra** si está vacío — no ponerlo vía `PATCH /menu/config` ni en `config.json`.
 
+### Idioma (opt-in, `config.locale`)
+`locale: "en"` pone el menú completo en inglés; sin la clave (o `"es"`) todo queda byte-idéntico. Motor:
+diccionario `EN` en `catalog.js` con **la clave = el texto en español** y `t(texto, ...args)` (`{0}` = args);
+`order-checkout.js` recibe `t` en `submit()` (sin `t` = español, así lo usan las tiendas). Worker: `SHELL_EN`
+en `lib.js` traduce el template por SSR (el test exige que cada texto exista en `template.html`). Los
+marcadores `[CraftOrder:…]` y `[Sede:…]` del mensaje de WhatsApp NO se traducen (los parsea craft-crm).
+Texto nuevo en el motor = envolverlo en `t()` y agregar su par en `EN` (y en `SHELL_EN` si va en el template).
+Pendiente: `geo.js` (selector de cobertura) sigue solo en español.
+
 ## Contrato del motor — NO romper
 No cambies los IDs/clases del shell que `catalog.js` usa: `brandLogo, brandName, heroTitle, heroNotice,
 searchInput, catStrip, catalog, footerText, sliderTrack, sliderPrev, sliderNext, sliderDots,

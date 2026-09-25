@@ -15,7 +15,37 @@ export async function resolveSlug(host, env) {
   return env.MENUS.get(`domain:${host}`);
 }
 
+// i18n del shell por SSR (opt-in con config.locale="en"): pares exactos texto-es → texto-en sobre el
+// template ANTES de inyectar contenido del cliente. Sin locale el HTML sale byte-idéntico.
+export const SHELL_EN = [
+  ['<html lang="es">', '<html lang="en">'],
+  ['aria-label="Cerrar"', 'aria-label="Close"'],
+  ['aria-label="Volver"', 'aria-label="Back"'],
+  ['aria-label="Favorito"', 'aria-label="Favorite"'],
+  ['aria-label="Anterior"', 'aria-label="Previous"'],
+  ['aria-label="Siguiente"', 'aria-label="Next"'],
+  ['</span> Ver mi carrito</span>', '</span> View cart</span>'],
+  ['</svg>\n      Inicio\n', '</svg>\n      Home\n'],
+  ['</svg>\n      Ofertas\n', '</svg>\n      Deals\n'],
+  ['</svg>\n      Carrito\n', '</svg>\n      Cart\n'],
+  ['</svg>\n      Ubicación\n', '</svg>\n      Location\n'],
+  ['<h2 id="cartTitle">Tu Pedido</h2>', '<h2 id="cartTitle">Your Order</h2>'],
+  ['\n        Realizar pedido\n', '\n        Place order\n'],
+  ['data-mode="delivery">Domicilio</button>', 'data-mode="delivery">Delivery</button>'],
+  ['data-mode="pickup">Retiro en local</button>', 'data-mode="pickup">Pickup</button>'],
+  ['data-mode="mesa">Mesa</button>', 'data-mode="mesa">Dine-in</button>'],
+  ['<label>Nombre y Apellido</label>', '<label>Full name</label>'],
+  ['placeholder="Ej: María González"', 'placeholder="e.g. John Smith"'],
+  ['<label>Teléfono</label>', '<label>Phone</label>'],
+  ['placeholder="Ej: 0991234567"', 'placeholder="e.g. (315) 555-0123"'],
+  ['<label>Dirección de entrega</label>', '<label>Delivery address</label>'],
+  ['placeholder="Sector, calles, número de casa y referencia..."', 'placeholder="Street, number, apt and delivery notes..."'],
+  ['\n          Confirmar pedido por WhatsApp\n', '\n          Confirm order on WhatsApp\n'],
+];
+const localize = (tpl, locale) => locale === "en" ? SHELL_EN.reduce((h, [es, en]) => h.replaceAll(es, en), tpl) : tpl;
+
 export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-catalog-engine.pages.dev/v1") {
+  tpl = localize(tpl, cfg.locale);
   const primary = cfg.theme_primary || (cfg.theme && cfg.theme.primary) || "#E4801C";
   const accent = cfg.theme_accent || (cfg.theme && cfg.theme.accent) || "#F5B301";
   const store = cfg.store_name || "Catálogo";
@@ -38,7 +68,7 @@ export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-ca
     .replace("<!--DIVIDER-->", cfg.hero_divider ? '<div class="hero-divider"></div>' : "")
     .replace("<!--KICKER-->", cfg.hero_kicker ? `<p class="hero-kicker">${esc(cfg.hero_kicker)}</p>` : "")
     .replace("<!--HERO-->", cfg.hero_title || "") // hero_title admite HTML (lo pone el operador)
-    .replace("<!--SEARCHPH-->", esc(cfg.search_placeholder || "Busca tu antojo..."))
+    .replace("<!--SEARCHPH-->", esc(cfg.search_placeholder || (cfg.locale === "en" ? "What are you craving?" : "Busca tu antojo...")))
     .replace("<!--COVERAGE-->", Array.isArray(cfg.location?.sedes) && cfg.location.sedes.some(s => s?.id && Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.radio_km > 0)
       ? '<script src="https://craft-catalog-engine.pages.dev/v1/geo.js" defer></script>' : '')
     .replace("<!--CONFIG-->", `window.__CONFIG__=${jsonInline(cfgRaw)}`);

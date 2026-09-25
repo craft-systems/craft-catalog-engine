@@ -7,13 +7,64 @@
     let products = [];
     let config = {};
     let coverage = null;
+    // i18n opt-in por config.locale. La clave ES el texto en español: sin locale (o "es") t() devuelve
+    // el mismo string → menús existentes byte-idénticos. {0},{1}… = argumentos.
+    const EN={
+      'No se pudo cargar el registro. Reintenta.':'Could not load the order service. Please try again.',
+      'No se pudo comprobar la cobertura. Recarga el menú para reintentar.':'Could not check delivery coverage. Reload the menu to try again.',
+      'Opción':'Option','Agotado':'Sold out','¡Quedan pocas!':'Only a few left!',
+      'Quitado de favoritos':'Removed from favorites','❤ Agregado a favoritos':'❤ Added to favorites',
+      'Stock insuficiente':'Not enough stock','Agregado al pedido':'Added to your order',
+      'Pedido anticipado para la próxima apertura: {0}. Lo despachamos apenas abramos.':'Pre-order for our next opening: {0}. We’ll prepare it as soon as we open.',
+      'Todo':'All','Categorías anteriores':'Previous categories','Más categorías':'More categories',
+      'Oferta':'Deal','Favorito':'Favorite','Elegir opciones':'Choose options','Agregar':'Add','Ver oferta':'View deal',
+      'Tus Favoritos':'Your Favorites','No tienes favoritos aún.':'No favorites yet.',
+      'Ofertas':'Deals','No hay ofertas activas ahora mismo.':'No active deals right now.',
+      'No se encontraron productos':'No products found','Síguenos':'Follow us','Ubicación':'Location',
+      '📍 Nuestra Ubicación':'📍 Our Location','📅 Haz una reserva':'📅 Make a reservation',
+      'Cuéntanos cuándo vienes y te confirmamos por WhatsApp':'Tell us when you’re coming and we’ll confirm on WhatsApp',
+      'Sabores':'Flavors','Personaliza':'Customize','— Elige una opción —':'— Choose an option —','Opciones':'Options','Salsa':'Sauce',
+      'Reparte {0} — faltan {1}':'Choose {0} — {1} left','Elige {0} {1}s':'Choose {0} {1}s',
+      'Selecciona todas las opciones':'Please select all options','Producto agotado':'Sold out',
+      '{0} item(s) · {1} producto(s)':'{0} item(s) · {1} product(s)','Empaque':'Packaging',
+      'Tu pedido está vacío':'Your order is empty','Quitar':'Remove','¿Algo más?':'Anything else?',
+      'Tu Pedido':'Your Order','Estamos cerrados ahora':'We’re closed right now','Datos de entrega':'Your details',
+      'WhatsApp no configurado':'WhatsApp is not set up','Completa tu nombre y teléfono':'Please enter your name and phone',
+      'Ingresa tu dirección de entrega':'Please enter your delivery address',
+      '¡Hola! Quiero hacer un pedido:':'Hi! I’d like to place an order:','¡Hola! Quiero pedir:':'Hi! I’d like to order:',
+      '*PEDIDO — {0}*':'*ORDER — {0}*','*ENTREGA:*':'*ORDER TYPE:*','Domicilio':'Delivery','Mesa':'Dine-in','Retiro en local':'Pickup',
+      '*Cliente:*':'*Customer:*','*Teléfono:*':'*Phone:*','*Dirección:*':'*Address:*','Registrando pedido…':'Placing your order…',
+      'La conexión tardó demasiado. Reintenta para recuperar tu número.':'The connection timed out. Try again to recover your order number.',
+      'No se pudo registrar el pedido. Reintenta.':'We couldn’t place your order. Please try again.',
+      'Este intento pertenece a otro pedido. Revisa el carrito antes de continuar.':'This attempt belongs to another order. Check your cart before continuing.',
+      'No se pudo confirmar el registro. Reintenta para recuperar tu número de pedido.':'We couldn’t confirm your order. Try again to recover your order number.',
+      'Pedido {0} registrado':'Order {0} placed','*Pedido {0}*':'*Order {0}*','Abriendo WhatsApp…':'Opening WhatsApp…',
+      'Te llevamos a WhatsApp para coordinar tu pedido. Si no se abrió, usa el botón.':'We’re taking you to WhatsApp to finish your order. If it didn’t open, use the button.',
+      'Continuar por WhatsApp':'Continue on WhatsApp','Crear otro pedido':'Start a new order',
+      'Nombre y apellido':'Full name','Tu nombre completo':'Your full name','Tu número de WhatsApp':'Your WhatsApp number',
+      'Día':'Day','Hora':'Time','¿Cuántas personas?':'How many people?','¿Celebran algo especial? (opcional)':'Celebrating something? (optional)',
+      'Cumpleaños, aniversario…':'Birthday, anniversary…','Confirmar reserva':'Confirm reservation',
+      'Completa nombre y WhatsApp':'Please enter your name and WhatsApp','el local':'the restaurant',
+      '¡Hola! Quiero hacer una *reserva* en {0}:':'Hi! I’d like to make a *reservation* at {0}:',
+      '*Nombre:*':'*Name:*','*Día:*':'*Day:*','*Hora:*':'*Time:*','*Personas:*':'*Guests:*','*Ocasión:*':'*Occasion:*',
+      'Estamos cerrados':'We’re closed','Ten mi pedido listo':'Browse the menu','📅 Hacer una reserva':'📅 Make a reservation',
+      'Vuelve en nuestro horario de atención.':'Come back during our opening hours.',
+      'Puedes explorar el menú y pedir dentro del horario de atención.':'You can browse the menu and order during opening hours.',
+      'No se pudo cargar el selector de ubicación. Recarga para reintentar.':'Could not load the location picker. Reload to try again.',
+      'Términos y condiciones':'Terms and conditions','Política de privacidad':'Privacy policy',
+      'Mín. <strong>{0} unidades</strong>':'Min. <strong>{0} units</strong>','con <strong>{0} días</strong> de anticipación':'<strong>{0} days</strong> in advance',
+      'Error cargando catálogo':'Error loading the menu',
+      'Domingo':'Sunday','Lunes':'Monday','Martes':'Tuesday','Miércoles':'Wednesday','Jueves':'Thursday','Viernes':'Friday','Sábado':'Saturday'
+    };
+    const isEN=()=>config.locale==='en';
+    const t=(s,...a)=>((isEN()&&EN[s])||s).replace(/\{(\d)\}/g,(_,i)=>a[i]);
   const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
   let checkoutBusy = false;
   async function orderCheckout(){
     if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
     await (window.craftOrderLoading ||= new Promise((resolve, reject) => {
       const script = document.createElement('script'); script.src = orderScriptURL;
-      script.onload = resolve; script.onerror = () => { window.craftOrderLoading = null; script.remove(); reject(new Error('No se pudo cargar el registro. Reintenta.')); };
+      script.onload = resolve; script.onerror = () => { window.craftOrderLoading = null; script.remove(); reject(new Error(t('No se pudo cargar el registro. Reintenta.'))); };
       document.head.append(script);
     }));
     return window.CraftOrderCheckout;
@@ -33,7 +84,7 @@
     function requireCoverage(){
       if(!needsCoverage())return true;
       if(coverage)return coverage.require();
-      showToast('No se pudo comprobar la cobertura. Recarga el menú para reintentar.');return false;
+      showToast(t('No se pudo comprobar la cobertura. Recarga el menú para reintentar.'));return false;
     }
     const orderPhone=()=>coverage?coverage.phone():(config.whatsapp_number||'').replace(/\D/g,'');
     const sedeNote=()=>coverage?coverage.note():'';
@@ -98,7 +149,7 @@
       if(gi<0) return null;
       const g=p.variantes[gi];
       const priceOf=lbl=>{const o=(g.options||[]).find(o=>getOptionKey(o)===lbl);return o?(getOptionPrice(o)||0):0;};
-      return {gi,g,pick:g.pick,free:g.free||0,item:g.item||'Opción',priceOf};
+      return {gi,g,pick:g.pick,free:g.free||0,item:g.item||t('Opción'),priceOf};
     }
     // Precio 3x2: suma de las elegidas menos las `free` más baratas.
     const comboTotal=(ci,labels)=>{
@@ -140,8 +191,8 @@
     const variantLabel=v=>(!v||!Object.keys(v).length)?'':Object.entries(v).map(([,x])=>vDisp(x)).filter(Boolean).join(' · ');
 
     function getStockInfo(p){
-      if(p.stock===0) return {badge:'Agotado',cls:'sold-out',canAdd:false,maxQty:0};
-      if(typeof p.stock==='number'&&p.stock>=1&&p.stock<=3) return {badge:'¡Quedan pocas!',cls:'low-stock',canAdd:true,maxQty:p.stock};
+      if(p.stock===0) return {badge:t('Agotado'),cls:'sold-out',canAdd:false,maxQty:0};
+      if(typeof p.stock==='number'&&p.stock>=1&&p.stock<=3) return {badge:t('¡Quedan pocas!'),cls:'low-stock',canAdd:true,maxQty:p.stock};
       return {badge:null,cls:'',canAdd:true,maxQty:Infinity};
     }
     const badgeCat=()=>config.badge_category||null;
@@ -191,8 +242,8 @@
     function toggleFav(id){
       id=String(id);
       const i=favs.indexOf(id);
-      if(i>=0){favs.splice(i,1);showToast('Quitado de favoritos');}
-      else{favs.push(id);showToast('❤ Agregado a favoritos');}
+      if(i>=0){favs.splice(i,1);showToast(t('Quitado de favoritos'));}
+      else{favs.push(id);showToast(t('❤ Agregado a favoritos'));}
       saveFavs();
       document.querySelectorAll(`.fav-btn[data-fav="${id}"]`).forEach(b=>b.classList.toggle('active',isFav(id)));
       if($modalFav.dataset.fav===id){$modalFav.classList.toggle('active',isFav(id));$modalFav.textContent=isFav(id)?'♥':'♡';}
@@ -208,10 +259,10 @@
       if(!p) return;
       const stock=getStockInfo(p),key=cartKey(id,variantes),existing=cartFind(key);
       const newQty=(existing?existing.qty:0)+qty;
-      if(newQty>stock.maxQty){showToast('Stock insuficiente');return;}
+      if(newQty>stock.maxQty){showToast(t('Stock insuficiente'));return;}
       if(existing) existing.qty+=qty;
       else cartItems.push({key,id,nombre:p.nombre,precio:getEffectivePrice(p,variantes),qty,variantes:variantes||{},imagen:getImages(p)[0]||''});
-      saveCart();updateCartUI();updateCardButtons();showToast('Agregado al pedido');
+      saveCart();updateCartUI();updateCardButtons();showToast(t('Agregado al pedido'));
       track('AddToCart',{contents:[{...cartFind(key),qty}]});
     }
     function cartRemoveOne(key){
@@ -268,12 +319,12 @@
           if(a>current&&a<next)next=a;
         }
       }
-      const nextLabel=Number.isFinite(next)?new Intl.DateTimeFormat('es-EC',{timeZone:'UTC',weekday:'long',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(next)):'';
+      const nextLabel=Number.isFinite(next)?new Intl.DateTimeFormat(isEN()?'en-US':'es-EC',{timeZone:'UTC',weekday:'long',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(next)):'';
       return {open,preorder:!open&&h.allow_preorders===true&&!!nextLabel,next:nextLabel};
     }
     function storeHoursOpen(h){return storeHoursState(h).open;}
     function checkoutBlocked(){const s=storeHoursState(config.hours);return !s.open&&!s.preorder;}
-    function preorderNote(){const s=storeHoursState(config.hours);return s.preorder?`Pedido anticipado para la próxima apertura: ${s.next}. Lo despachamos apenas abramos.`:'';}
+    function preorderNote(){const s=storeHoursState(config.hours);return s.preorder?t('Pedido anticipado para la próxima apertura: {0}. Lo despachamos apenas abramos.',s.next):'';}
 
     /* ── CATEGORY STRIP ── */
     // Orden: config.category_order primero (el sync lo preserva), luego el resto. El sync
@@ -287,7 +338,7 @@
     function buildCatStrip(){
       const catMap=config.categories||{};
       categorySlugs=orderedCategorySlugs();
-      let html=`<button class="cat-chip active" data-cat="all"><span class="ic">🔥</span><span class="lb">Todo</span></button>`;
+      let html=`<button class="cat-chip active" data-cat="all"><span class="ic">🔥</span><span class="lb">${t('Todo')}</span></button>`;
       categorySlugs.forEach(slug=>{
         const name=catMap[slug]||slug;
         html+=`<button class="cat-chip" data-cat="${slug}"><span class="ic">${catIcon(slug,name)}</span><span class="lb">${catLabel(name)}</span></button>`;
@@ -308,8 +359,8 @@
         `<button class="cat-nav ${cls}" type="button" aria-label="${label}" data-dir="${dir}">`+
         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" `+
         `stroke-linecap="round" stroke-linejoin="round"><polyline points="${pts}"/></svg></button>`;
-      rail.insertAdjacentHTML('afterbegin',arrow('prev',-1,'Categorías anteriores','15 18 9 12 15 6'));
-      rail.insertAdjacentHTML('beforeend',arrow('next',1,'Más categorías','9 18 15 12 9 6'));
+      rail.insertAdjacentHTML('afterbegin',arrow('prev',-1,t('Categorías anteriores'),'15 18 9 12 15 6'));
+      rail.insertAdjacentHTML('beforeend',arrow('next',1,t('Más categorías'),'9 18 15 12 9 6'));
       const prev=rail.querySelector('.cat-nav.prev'),next=rail.querySelector('.cat-nav.next');
       const sync=()=>{
         const max=$catStrip.scrollWidth-$catStrip.clientWidth;
@@ -338,7 +389,7 @@
       const stock=getStockInfo(p);
       const catLabels=config.categories||{};
       const imgHTML=imgs[0]?`<img src="${imgs[0]}" alt="${p.nombre}" loading="lazy"/>`:`<div class="card-img-placeholder">${catIcon((p.categorias||[])[0],p.nombre)}</div>`;
-      const badgeHTML=(badgeCat()&&(p.categorias||[]).includes(badgeCat()))?`<span class="card-badge">${catLabels[badgeCat()]||badgeCat()}</span>`:(p.precio_promo?`<span class="card-badge">Oferta</span>`:'');
+      const badgeHTML=(badgeCat()&&(p.categorias||[]).includes(badgeCat()))?`<span class="card-badge">${catLabels[badgeCat()]||badgeCat()}</span>`:(p.precio_promo?`<span class="card-badge">${t('Oferta')}</span>`:'');
       const stockBadgeHTML=stock.badge?`<span class="card-stock-badge ${stock.cls}">${stock.badge}</span>`:'';
       const imgCountHTML=imgs.length>1?`<span class="card-img-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>${imgs.length}</span>`:'';
       const priceDisplay=typeof p.precio==='number'?formatPrice(p.precio):(p.precio||'');
@@ -346,7 +397,7 @@
         <div class="card" data-id="${p.id}" style="animation-delay:${i*.04}s">
           <div class="card-img" data-open="${p.id}">
             ${imgHTML}${badgeHTML}${stockBadgeHTML}${imgCountHTML}
-            <button class="fav-btn${isFav(p.id)?' active':''}" data-fav="${p.id}" aria-label="Favorito">${isFav(p.id)?'♥':'♡'}</button>
+            <button class="fav-btn${isFav(p.id)?' active':''}" data-fav="${p.id}" aria-label="${t('Favorito')}">${isFav(p.id)?'♥':'♡'}</button>
           </div>
           <div class="card-body">
             <div class="card-name">${p.nombre}</div>
@@ -369,8 +420,8 @@
             <button data-action="inc" data-id="${p.id}" ${!stock.canAdd||inCartQty>=stock.maxQty?'disabled':''}>+</button>
           </div>`;
       }
-      if(!hasVariants&&!stock.canAdd) return `<button class="btn-add" disabled>Agotado</button>`;
-      return `<button class="btn-add icon-only" ${hasVariants?`data-open="${p.id}"`:`data-add="${p.id}"`} aria-label="${hasVariants?'Elegir opciones':'Agregar'}">
+      if(!hasVariants&&!stock.canAdd) return `<button class="btn-add" disabled>${t('Agotado')}</button>`;
+      return `<button class="btn-add icon-only" ${hasVariants?`data-open="${p.id}"`:`data-add="${p.id}"`} aria-label="${hasVariants?t('Elegir opciones'):t('Agregar')}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>`;
     }
@@ -381,7 +432,7 @@
       const promos=products.filter(p=>isPromo(p)&&promoActiveToday(p));
       if(!promos.length) return '';
       const full=config.promo_full_image; // arte ya diseñado: imagen entera, sin overlay del motor
-      const ctaText=config.promo_cta_text||'Ver oferta';
+      const ctaText=config.promo_cta_text||t('Ver oferta');
       const slides=promos.map(p=>{
         const img=getImages(p)[0]||'';
         if(full&&img) return `<div class="promo-slide full" data-open="${p.id}"><img src="${img}" alt="${p.nombre}" loading="lazy"></div>`;
@@ -426,13 +477,13 @@
       document.body.classList.remove('location-view');
       if(activeFilter==='__favs__'){
         setActiveChip(null);
-        renderFlat(products.filter(p=>isFav(p.id)&&matchSearch(p)),'Tus Favoritos','❤️','No tienes favoritos aún.','Toca el ♡ en cualquier producto para guardarlo.');
+        renderFlat(products.filter(p=>isFav(p.id)&&matchSearch(p)),t('Tus Favoritos'),'❤️',t('No tienes favoritos aún.'),'Toca el ♡ en cualquier producto para guardarlo.');
         return;
       }
       if(activeFilter==='__offers__'){
         setActiveChip(null);
         // Ofertas: TODAS las promos (el gate de día solo aplica al banner) + productos con precio_promo.
-        renderFlat(products.filter(p=>(isPromo(p)||isOffer(p))&&matchSearch(p)),'Ofertas','🏷️','No hay ofertas activas ahora mismo.');
+        renderFlat(products.filter(p=>(isPromo(p)||isOffer(p))&&matchSearch(p)),t('Ofertas'),'🏷️',t('No hay ofertas activas ahora mismo.'));
         return;
       }
 
@@ -455,7 +506,7 @@
           <div class="grid">${inCat.map((p,i)=>cardHTML(p,i)).join('')}</div>
         </div>`;
       });
-      $catalog.innerHTML=html||`<div class="empty-state"><span class="em">🔍</span><p>No se encontraron productos</p></div>`;
+      $catalog.innerHTML=html||`<div class="empty-state"><span class="em">🔍</span><p>${t('No se encontraron productos')}</p></div>`;
       setActiveChip(activeFilter);
       setupPromoBanner();
       setupIntersectionObserver();
@@ -503,7 +554,7 @@
 
       const socialHTML=(social.facebook||social.instagram||social.tiktok)?`
         <div class="social-section">
-          <div class="social-title">Síguenos</div>
+          <div class="social-title">${t('Síguenos')}</div>
           <div class="social-strip">
             ${social.facebook?`<a class="social-btn" href="${social.facebook}" target="_blank" rel="noopener" aria-label="Facebook">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
@@ -518,16 +569,16 @@
         </div>`:'';
 
       const mapEmbed=config.location&&config.location.map_embed;
-      const mapHTML=mapEmbed?`<div class="location-map"><iframe src="${mapEmbed}" style="border:0" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="Ubicación"></iframe></div>`:'';
+      const mapHTML=mapEmbed?`<div class="location-map"><iframe src="${mapEmbed}" style="border:0" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="${t('Ubicación')}"></iframe></div>`:'';
 
       // Copy de la vista de ubicación: SIEMPRE desde config. El motor es el esqueleto y no
       // lleva texto de ningún cliente; los defaults son genéricos y `location_intro` es el
       // campo de marca que escribe el onboarding. Una clave vacía omite el elemento.
       const locCfg=config.location||{};
-      const locHeading=locCfg.heading!==undefined?locCfg.heading:'📍 Nuestra Ubicación';
+      const locHeading=locCfg.heading!==undefined?locCfg.heading:t('📍 Nuestra Ubicación');
       const locIntro=locCfg.intro!==undefined?locCfg.intro:(config.location_intro||'');
-      const resTitulo=locCfg.reserva_titulo||'📅 Haz una reserva';
-      const resSub=locCfg.reserva_sub||'Cuéntanos cuándo vienes y te confirmamos por WhatsApp';
+      const resTitulo=locCfg.reserva_titulo||t('📅 Haz una reserva');
+      const resSub=locCfg.reserva_sub||t('Cuéntanos cuándo vienes y te confirmamos por WhatsApp');
       const reservasOn=reservasActivas();
 
       $catalog.innerHTML=`
@@ -623,11 +674,11 @@
 
       let variantHTML='';
       if(dist){
-        const glabel=`<div class="variant-glabel">${dist.group.name||'Sabores'} — ${distSum}/${dist.total}</div>`;
+        const glabel=`<div class="variant-glabel">${dist.group.name||t('Sabores')} — ${distSum}/${dist.total}</div>`;
         // Grupos reutilizables (pick>0) → pills (tap +1 repetible, badge ×N, "−" para quitar).
         // distribute legacy inline → steppers (BW intacto hasta migrar).
         if(dist.group.pick>0){
-          variantHTML='<div class="customize-label">Personaliza</div>'+
+          variantHTML=`<div class="customize-label">${t('Personaliza')}</div>`+
             `<div class="variant-group">${glabel}<div class="variant-options">`+
             dist.group.options.map(opt=>{
               const k=getOptionKey(opt),c=modalDist[k]||0;
@@ -637,7 +688,7 @@
               `</button>`;
             }).join('')+`</div></div>`;
         } else {
-          variantHTML='<div class="customize-label">Personaliza</div>'+
+          variantHTML=`<div class="customize-label">${t('Personaliza')}</div>`+
             `<div class="variant-group">${glabel}`+
             dist.group.options.map(opt=>{
               const k=getOptionKey(opt),c=modalDist[k]||0;
@@ -657,7 +708,7 @@
         const groupHTML=(glabel,attr,options,cur)=>options.length>4
           ?`<div class="variant-group"><div class="variant-glabel">${glabel}</div>
               <select class="variant-select" ${attr}>
-                <option value="">— Elige una opción —</option>
+                <option value="">${t('— Elige una opción —')}</option>
                 ${options.map(opt=>{const k=getOptionKey(opt);return`<option value="${k}"${cur===k?' selected':''}>${optLabel(opt)}</option>`;}).join('')}
               </select></div>`
           :`<div class="variant-group"><div class="variant-glabel">${glabel}</div>
@@ -667,18 +718,18 @@
         if(combo){
           let comboHTML='';
           for(let k=0;k<combo.pick;k++) comboHTML+=groupHTML(`${combo.item} ${k+1}`,`data-combo-k="${k}"`,combo.g.options,modalCombo[k]||'');
-          variantHTML='<div class="customize-label">Personaliza</div>'+comboHTML;
+          variantHTML=`<div class="customize-label">${t('Personaliza')}</div>`+comboHTML;
         } else {
         const staticHTML=p.variantes.map((g,idx)=>
-          (rep&&idx===rep.ri)?'':groupHTML(g.name||'Opciones',`data-group-idx="${idx}"`,g.options,modalVariants[idx]||'')
+          (rep&&idx===rep.ri)?'':groupHTML(g.name||t('Opciones'),`data-group-idx="${idx}"`,g.options,modalVariants[idx]||'')
         ).join('');
         // Selectores clonados de la plantilla (rep.n copias, "Salsa 1..N").
         let repeatHTML='';
         if(rep&&rep.n>0){
-          const base=rep.group.name||'Salsa';
+          const base=rep.group.name||t('Salsa');
           for(let k=0;k<rep.n;k++) repeatHTML+=groupHTML(`${base} ${k+1}`,`data-repeat-k="${k}"`,rep.group.options,modalRepeat[k]||'');
         }
-        variantHTML='<div class="customize-label">Personaliza</div>'+staticHTML+repeatHTML;
+        variantHTML=`<div class="customize-label">${t('Personaliza')}</div>`+staticHTML+repeatHTML;
         }
       }
 
@@ -691,8 +742,8 @@
         ${stock.badge?`<div><span class="modal-stock-badge ${stock.cls}">${stock.badge}</span></div>`:''}
         ${p.descripcion?`<div class="modal-desc">${p.descripcion}</div>`:''}
         ${variantHTML}
-        ${hasVariants&&!allSelected?`<p class="modal-variant-hint">${dist?`Reparte ${dist.total} — faltan ${dist.total-distSum}`:(combo?`Elige ${combo.pick} ${combo.item.toLowerCase()}s`:'Selecciona todas las opciones')}</p>`:''}
-        ${!stock.canAdd&&allSelected?'<p class="modal-stock-hint">Producto agotado</p>':''}
+        ${hasVariants&&!allSelected?`<p class="modal-variant-hint">${dist?t('Reparte {0} — faltan {1}',dist.total,dist.total-distSum):(combo?t('Elige {0} {1}s',combo.pick,combo.item.toLowerCase()):t('Selecciona todas las opciones'))}</p>`:''}
+        ${!stock.canAdd&&allSelected?`<p class="modal-stock-hint">${t('Producto agotado')}</p>`:''}
         <div class="modal-actions">
           <div class="modal-qty">
             <button id="mqDec">−</button>
@@ -700,13 +751,13 @@
             <button id="mqInc" ${!stock.canAdd||modalQty>=stock.maxQty?'disabled':''}>+</button>
           </div>
           <button class="btn-modal-add" id="btnModalAdd" ${!canAddModal?'disabled':''}>
-            ${stock.canAdd?`Agregar · ${formatPrice(effPrice*modalQty)}`:'Agotado'}
+            ${stock.canAdd?`${t('Agregar')} · ${formatPrice(effPrice*modalQty)}`:t('Agotado')}
           </button>
         </div>`;
 
       document.getElementById('mqDec').addEventListener('click',()=>{if(modalQty>1){modalQty--;renderModalDetail();}});
       document.getElementById('mqInc').addEventListener('click',()=>{
-        if(modalQty>=stock.maxQty){showToast('Stock insuficiente');return;}
+        if(modalQty>=stock.maxQty){showToast(t('Stock insuficiente'));return;}
         modalQty++;renderModalDetail();
       });
       document.getElementById('btnModalAdd').addEventListener('click',()=>{
@@ -717,7 +768,7 @@
           v={[dist.group.name]:{label,price:parsePrice(p)+distDeltaOf(dist.group,modalDist)}};
         } else if(rep&&rep.n>0){
           v=Object.assign({},modalVariants);
-          const base=rep.group.name||'Salsa';
+          const base=rep.group.name||t('Salsa');
           for(let k=0;k<rep.n;k++) v['r'+k]=`${base} ${k+1}: ${modalRepeat[k]}`;
         } else if(combo){
           v={};for(let k=0;k<combo.pick;k++) v['c'+k]=modalCombo[k];
@@ -802,7 +853,7 @@
       const sheetOpen=$cartDrawer.classList.contains('open');
       $cartPeek.classList.toggle('show',qty>0&&!sheetOpen);
       $cartTotal.textContent=formatPrice(total);
-      $cartItemCount.textContent=`${qty} item(s) · ${cartItems.length} producto(s)`;
+      $cartItemCount.textContent=t('{0} item(s) · {1} producto(s)',qty,cartItems.length);
       $btnCheckout.disabled=qty===0||storeClosed;
 
       // Línea de empaque en el footer (creada al vuelo; el HTML del cliente no la trae).
@@ -810,13 +861,13 @@
       const footer=$cartTotal.closest('.cart-footer');
       if(fee>0&&qty>0){
         if(!feeLine&&footer){feeLine=document.createElement('div');feeLine.id='cartFeeLine';feeLine.className='cart-fee';footer.insertBefore(feeLine,footer.firstChild);}
-        if(feeLine) feeLine.innerHTML=`<span>${(config.packaging&&config.packaging.label)||'Empaque'}</span><span>${formatPrice(fee)}</span>`;
+        if(feeLine) feeLine.innerHTML=`<span>${t((config.packaging&&config.packaging.label)||'Empaque')}</span><span>${formatPrice(fee)}</span>`;
       }else if(feeLine){feeLine.remove();}
 
       renderCrossSell();
 
       if(!cartItems.length){
-        $cartItems.innerHTML=`<div class="cart-empty"><span class="em">🛒</span><p>Tu pedido está vacío</p></div>`;
+        $cartItems.innerHTML=`<div class="cart-empty"><span class="em">🛒</span><p>${t('Tu pedido está vacío')}</p></div>`;
         return;
       }
       $cartItems.innerHTML=cartItems.map(item=>{
@@ -828,7 +879,7 @@
             ${vLabel?`<div class="cart-item-variant">${vLabel}</div>`:''}
             <div class="cart-item-detail">${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}</div>
           </div>
-          <button class="cart-item-remove" data-key="${item.key}" title="Quitar">✕</button>
+          <button class="cart-item-remove" data-key="${item.key}" title="${t('Quitar')}">✕</button>
         </div>`;
       }).join('');
     }
@@ -846,11 +897,11 @@
       const items=pool.slice(0,cfg.max||6);
       if(!items.length){ if(box) box.remove(); return; }
       if(!box){ box=document.createElement('div');box.id='crossSell';box.className='cross-sell';footer.parentNode.insertBefore(box,footer); }
-      box.innerHTML=`<div class="cross-sell-title">${cfg.title||'¿Algo más?'}</div><div class="cross-sell-strip">`+
+      box.innerHTML=`<div class="cross-sell-title">${cfg.title||t('¿Algo más?')}</div><div class="cross-sell-strip">`+
         items.map(p=>{
           const hasV=Array.isArray(p.variantes)&&p.variantes.length>0,img=getImages(p)[0];
           const price=typeof p.precio==='number'?formatPrice(p.precio):(p.precio||'');
-          return `<button class="xs-card" ${hasV?`data-open="${p.id}"`:`data-add="${p.id}"`} aria-label="Agregar ${p.nombre}">
+          return `<button class="xs-card" ${hasV?`data-open="${p.id}"`:`data-add="${p.id}"`} aria-label="${t('Agregar')} ${p.nombre}">
             ${img?`<img src="${img}" alt="${p.nombre}" loading="lazy"/>`:`<div class="xs-ph">🍽️</div>`}
             <div class="xs-name">${p.nombre}</div>
             <div class="xs-foot"><span class="xs-price">${price}</span><span class="xs-add">+</span></div>
@@ -865,18 +916,18 @@
       $cartItems.style.display='';
       document.querySelector('.cart-footer').style.display='';
       document.getElementById('cartStep2').style.display='none';
-      document.getElementById('cartTitle').textContent='Tu Pedido';
+      document.getElementById('cartTitle').textContent=t('Tu Pedido');
       document.getElementById('cartBack').style.display='none';
     }
     function goToStep2(){
       if(!cartItems.length) return;
       if(!requireCoverage())return;
-      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||t('Estamos cerrados ahora'));return;}
       track('InitiateCheckout',{contents:cartItems});
       $cartItems.style.display='none';
       document.querySelector('.cart-footer').style.display='none';
       document.getElementById('cartStep2').style.display='flex';
-      document.getElementById('cartTitle').textContent='Datos de entrega';
+      document.getElementById('cartTitle').textContent=t('Datos de entrega');
       let notice=document.getElementById('preorderNotice');
       if(!notice){notice=document.createElement('p');notice.id='preorderNotice';document.getElementById('cartStep2').prepend(notice);}
       notice.textContent=preorderNote();
@@ -888,17 +939,17 @@
       if(checkoutBusy) return;
       if(!requireCoverage())return;
       const num=orderPhone();
-      if(!num){showToast('WhatsApp no configurado');return;}
+      if(!num){showToast(t('WhatsApp no configurado'));return;}
       const name=document.getElementById('fieldName').value.trim();
       const phone=document.getElementById('fieldPhone').value.trim();
       const mode=document.querySelector('.dtog-btn.active')?.dataset.mode||'delivery';
       const address=mode==='delivery'?document.getElementById('fieldAddress').value.trim():'';
-      if(!name||!phone){showToast('Completa tu nombre y teléfono');return;}
-      if(mode==='delivery'&&!address){showToast('Ingresa tu dirección de entrega');return;}
-      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      if(!name||!phone){showToast(t('Completa tu nombre y teléfono'));return;}
+      if(mode==='delivery'&&!address){showToast(t('Ingresa tu dirección de entrega'));return;}
+      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||t('Estamos cerrados ahora'));return;}
       const fee=packagingFee(mode),cur=config.currency||'$',store=config.store_name||'Catálogo';
       const total=cartTotalPrice()+fee;
-      const pkgLabel=(config.packaging&&config.packaging.label)||'Empaque';
+      const pkgLabel=t((config.packaging&&config.packaging.label)||'Empaque');
 
       const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined}));
       if(fee>0) notifyItems.push({nombre:pkgLabel,qty:1,precio:fee});
@@ -906,7 +957,7 @@
         total,currency:cur,client_name:name,client_phone:phone,delivery_mode:mode,address:address||undefined,
         store_url:location.href,latitude:coverage?.coordinates?.lat,longitude:coverage?.coordinates?.lng };
 
-      let msg=`${config.whatsapp_message||'¡Hola! Quiero hacer un pedido:'}\n\n*PEDIDO — ${store}*\n━━━━━━━━━━━━━━━━━\n`;
+      let msg=`${config.whatsapp_message||t('¡Hola! Quiero hacer un pedido:')}\n\n${t('*PEDIDO — {0}*',store)}\n━━━━━━━━━━━━━━━━━\n`;
       if(preorderNote())msg+=preorderNote()+'\n';
       cartItems.forEach(item=>{
         const vLabel=variantLabel(item.variantes);
@@ -914,21 +965,21 @@
       });
       if(fee>0) msg+=`▸ ${pkgLabel}\n  ${formatPrice(fee)}\n`;
       msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
-      msg+=`*ENTREGA:* ${mode==='delivery'?'Domicilio':mode==='mesa'?'Mesa':'Retiro en local'}\n`;
-      msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
-      if(address) msg+=`*Dirección:* ${address}\n`;
+      msg+=`${t('*ENTREGA:*')} ${t(mode==='delivery'?'Domicilio':mode==='mesa'?'Mesa':'Retiro en local')}\n`;
+      msg+=`${t('*Cliente:*')} ${name}\n${t('*Teléfono:*')} ${phone}\n`;
+      if(address) msg+=`${t('*Dirección:*')} ${address}\n`;
       msg+=sedeNote()+`\n${location.href}`;
       if(config.catalog_notify_url && config.catalog_notify_token){
         checkoutBusy = true;
         const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
         const label = button?.textContent;
-        if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
+        if(button){ button.disabled = true; button.textContent = t('Registrando pedido…'); }
         try {
           const checkout = await orderCheckout();
-          await checkout.submit({url:config.catalog_notify_url,payload,phone:num,message:msg,
+          await checkout.submit({url:config.catalog_notify_url,payload,phone:num,message:msg,t,
             container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body,
             onSuccess:receipt=>track('Purchase',{contents:cartItems,value:total,order_id:receipt.id})});
-        } catch(error) { showToast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
+        } catch(error) { showToast(t(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.')); }
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
@@ -957,10 +1008,10 @@
     // Vitrina WhatsApp: abre wa.me con el producto prellenado (config.wa_order).
     function waQuick(p){
       if(!requireCoverage())return;
-      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||t('Estamos cerrados ahora'));return;}
       const num=orderPhone();if(!num)return;
       const price=typeof p.precio==='number'?` — ${formatPrice(p.precio)}`:(p.precio?` — ${p.precio}`:'');
-      const msg=`${config.whatsapp_message||'¡Hola! Quiero pedir:'}\n\n• ${p.nombre}${price}`+sedeNote()+'\n'+preorderNote();
+      const msg=`${config.whatsapp_message||t('¡Hola! Quiero pedir:')}\n\n• ${p.nombre}${price}`+sedeNote()+'\n'+preorderNote();
       window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
     }
 
@@ -1045,26 +1096,26 @@
       return slots;
     }
     function reservationFormHTML(){
-      const days=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const days=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map(d=>t(d));
       const weekly=(config.hours&&config.hours.weekly)||{};
       const configured=Object.entries(weekly).filter(([,r])=>r&&r.length).map(([d])=>+d);
       const dayOpts=(configured.length?configured:[0,1,2,3,4,5,6]).map(d=>`<option value="${d}">${days[d]}</option>`).join('');
       return `<div class="reserve-form">
-        <div class="form-field"><label>Nombre y apellido</label>
-          <input type="text" class="res-name" placeholder="Tu nombre completo" autocomplete="name"/></div>
+        <div class="form-field"><label>${t('Nombre y apellido')}</label>
+          <input type="text" class="res-name" placeholder="${t('Tu nombre completo')}" autocomplete="name"/></div>
         <div class="form-field"><label>WhatsApp</label>
-          <input type="tel" class="res-phone" placeholder="Tu número de WhatsApp" autocomplete="tel"/></div>
+          <input type="tel" class="res-phone" placeholder="${t('Tu número de WhatsApp')}" autocomplete="tel"/></div>
         <div class="reserve-row">
-          <div class="form-field"><label>Día</label><select class="res-day">${dayOpts}</select></div>
-          <div class="form-field"><label>Hora</label><select class="res-time"></select></div>
+          <div class="form-field"><label>${t('Día')}</label><select class="res-day">${dayOpts}</select></div>
+          <div class="form-field"><label>${t('Hora')}</label><select class="res-time"></select></div>
         </div>
-        <div class="form-field"><label>¿Cuántas personas?</label>
+        <div class="form-field"><label>${t('¿Cuántas personas?')}</label>
           <input type="number" class="res-people" min="1" step="1" value="2" inputmode="numeric"/></div>
-        <div class="form-field"><label>¿Celebran algo especial? (opcional)</label>
-          <input type="text" class="res-occasion" placeholder="Cumpleaños, aniversario…"/></div>
+        <div class="form-field"><label>${t('¿Celebran algo especial? (opcional)')}</label>
+          <input type="text" class="res-occasion" placeholder="${t('Cumpleaños, aniversario…')}"/></div>
         <button class="btn-reserve-submit">
           <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          Confirmar reserva
+          ${t('Confirmar reserva')}
         </button>
       </div>`;
     }
@@ -1075,16 +1126,16 @@
       container.querySelector('.btn-reserve-submit').addEventListener('click',()=>{
         const name=container.querySelector('.res-name').value.trim();
         const phone=container.querySelector('.res-phone').value.trim();
-        if(!name||!phone){showToast('Completa nombre y WhatsApp');return;}
+        if(!name||!phone){showToast(t('Completa nombre y WhatsApp'));return;}
         const num=(config.whatsapp_number||'').replace(/\D/g,'');
-        if(!num){showToast('WhatsApp no configurado');return;}
+        if(!num){showToast(t('WhatsApp no configurado'));return;}
         const day=dayEl.options[dayEl.selectedIndex].text,time=timeEl.value;
         const people=(container.querySelector('.res-people').value||'').trim();
         const occasion=container.querySelector('.res-occasion').value.trim();
-        const store=config.store_name||'el local';
-        let msg=`¡Hola! Quiero hacer una *reserva* en ${store}:\n\n*Nombre:* ${name}\n*WhatsApp:* ${phone}\n*Día:* ${day}\n*Hora:* ${time}`;
-        if(people) msg+=`\n*Personas:* ${people}`;
-        if(occasion) msg+=`\n*Ocasión:* ${occasion}`;
+        const store=config.store_name||t('el local');
+        let msg=`${t('¡Hola! Quiero hacer una *reserva* en {0}:',store)}\n\n${t('*Nombre:*')} ${name}\n*WhatsApp:* ${phone}\n${t('*Día:*')} ${day}\n${t('*Hora:*')} ${time}`;
+        if(people) msg+=`\n${t('*Personas:*')} ${people}`;
+        if(occasion) msg+=`\n${t('*Ocasión:*')} ${occasion}`;
         window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
       });
     }
@@ -1095,18 +1146,18 @@
       const conReservas=reservasActivas();
       el.innerHTML=`<div class="closed-modal">
         <div class="closed-icon">🌙</div>
-        <h2 class="closed-title">Estamos cerrados</h2>
+        <h2 class="closed-title">${t('Estamos cerrados')}</h2>
         <p class="closed-msg"></p>
         <p class="closed-sub"></p>
         <div class="closed-btns">
-          <button class="btn-closed-browse">Ten mi pedido listo</button>
-          ${conReservas?'<button class="btn-closed-reserve">📅 Hacer una reserva</button>':''}
+          <button class="btn-closed-browse">${t('Ten mi pedido listo')}</button>
+          ${conReservas?`<button class="btn-closed-reserve">${t('📅 Hacer una reserva')}</button>`:''}
         </div>
         ${conReservas?`<div class="closed-reserve-wrap" style="display:none">${reservationFormHTML()}</div>`:''}
       </div>`;
       document.body.appendChild(el);
-      el.querySelector('.closed-msg').textContent=(config.hours&&config.hours.closed_msg)||'Vuelve en nuestro horario de atención.';
-      el.querySelector('.closed-sub').textContent=preorderNote()||'Puedes explorar el menú y pedir dentro del horario de atención.';
+      el.querySelector('.closed-msg').textContent=(config.hours&&config.hours.closed_msg)||t('Vuelve en nuestro horario de atención.');
+      el.querySelector('.closed-sub').textContent=preorderNote()||t('Puedes explorar el menú y pedir dentro del horario de atención.');
       el.querySelector('.btn-closed-browse').addEventListener('click',()=>el.classList.remove('open'));
       if(conReservas){
         el.querySelector('.btn-closed-reserve').addEventListener('click',()=>{
@@ -1130,7 +1181,7 @@
             script.onload=resolve;script.onerror=reject;document.head.append(script);
           });
           coverage=window.CraftGeo.create(config);
-        }catch{showToast('No se pudo cargar el selector de ubicación. Recarga para reintentar.');}
+        }catch{showToast(t('No se pudo cargar el selector de ubicación. Recarga para reintentar.'));}
       }
 
       // Tema: aplica tokens de config.theme (objeto) + claves legacy theme_primary/accent.
@@ -1152,8 +1203,8 @@
       document.title=config.site_title||store;
       document.getElementById('footerText').innerHTML=
         `© ${new Date().getFullYear()} <strong>${store}</strong>`+
-        `<span class="footer-sep">|</span><a href="#" id="lnkTerms">Términos y condiciones</a>`+
-        `<span class="footer-sep">|</span><a href="#" id="lnkPrivacy">Política de privacidad</a>`+
+        `<span class="footer-sep">|</span><a href="#" id="lnkTerms">${t('Términos y condiciones')}</a>`+
+        `<span class="footer-sep">|</span><a href="#" id="lnkPrivacy">${t('Política de privacidad')}</a>`+
         `<br><span class="footer-credit">Powered by <a href="https://craftmarketing.agency" target="_blank" rel="noopener">Craft Systems</a></span>`;
       if(config.hero_title) document.getElementById('heroTitle').innerHTML=config.hero_title;
 
@@ -1183,20 +1234,20 @@
       // Burbuja de WhatsApp: número dinámico desde config (no hardcodear en el index).
       const waFloat=document.querySelector('.wa-float'),waBubble=(config.whatsapp_number||'').replace(/\D/g,'');
       if(waFloat){
-        if(waBubble) waFloat.href=`https://wa.me/${waBubble}?text=${encodeURIComponent(config.whatsapp_message||'¡Hola! Quiero hacer un pedido:')}`;
+        if(waBubble) waFloat.href=`https://wa.me/${waBubble}?text=${encodeURIComponent(config.whatsapp_message||t('¡Hola! Quiero hacer un pedido:'))}`;
         else waFloat.style.display='none';
         waFloat.addEventListener('click',e=>{
           if(!needsCoverage())return;
           e.preventDefault();if(!requireCoverage())return;
-          const num=orderPhone();if(num)window.open(`https://wa.me/${num}?text=${encodeURIComponent((config.whatsapp_message||'¡Hola! Quiero hacer un pedido:')+sedeNote())}`,'_blank');
+          const num=orderPhone();if(num)window.open(`https://wa.me/${num}?text=${encodeURIComponent((config.whatsapp_message||t('¡Hola! Quiero hacer un pedido:'))+sedeNote())}`,'_blank');
         });
       }
 
       const mu=config.min_units,md=config.min_days_advance;
       if(mu||md){
         const parts=[];
-        if(mu) parts.push(`Mín. <strong>${mu} unidades</strong>`);
-        if(md) parts.push(`con <strong>${md} días</strong> de anticipación`);
+        if(mu) parts.push(t('Mín. <strong>{0} unidades</strong>',mu));
+        if(md) parts.push(t('con <strong>{0} días</strong> de anticipación',md));
         const $n=document.getElementById('heroNotice');
         $n.innerHTML=parts.join(', ')+'.';$n.style.display='inline-block';
       }
@@ -1231,6 +1282,31 @@
       const body=document.getElementById('legalBody');
       const store=config.store_name||'el local';
       const wa=(config.whatsapp_number||'').replace(/\D/g,'');
+      if(isEN()){ // texto legal en inglés completo (no frase a frase): sin IVA ni referencias locales de EC
+        const en=config.store_name||'the restaurant';
+        title.textContent=t(type==='terms'?'Términos y condiciones':'Política de privacidad');
+        body.innerHTML=type==='terms'?`<h4>1. Use of the digital menu</h4>
+          <p>This digital menu is an informational tool from ${en} to make ordering through WhatsApp easier. Placing an order means you accept these terms.</p>
+          <h4>2. Orders and payment</h4>
+          <p>Orders are confirmed only through WhatsApp. Prices are in US dollars (USD); applicable taxes may be added. ${en} may change prices without prior notice.</p>
+          <h4>3. Delivery</h4>
+          <p>Delivery times are estimates and may vary with demand and distance. Any delivery fee is agreed with you when the order is confirmed.</p>
+          <h4>4. Cancellations</h4>
+          <p>Once an order is confirmed on WhatsApp, cancellation is subject to the restaurant’s approval. Orders already being prepared cannot be cancelled.</p>
+          <h4>5. Availability</h4>
+          <p>Products are subject to availability. ${en} cannot guarantee that every item is available at all times.</p>`
+          :`<h4>1. Data we collect</h4>
+          <p>When you place an order we collect your full name, phone number and delivery address, used only to process and deliver your order.</p>
+          <h4>2. How we use it</h4>
+          <p>Your personal data is not sold, transferred or shared with third parties outside ${en}, except when required by law.</p>
+          <h4>3. WhatsApp</h4>
+          <p>Communication happens through WhatsApp. By contacting us you accept WhatsApp’s terms and privacy policy (Meta Platforms, Inc.).</p>
+          <h4>4. Cookies</h4>
+          <p>This site uses your browser’s localStorage only to remember your cart and favorites. We don’t use tracking or advertising cookies.</p>
+          <h4>5. Contact</h4>
+          <p>For any question about your data, contact us on WhatsApp${wa?' +'+wa:''}.</p>`;
+        overlay.classList.add('open');return;
+      }
       if(type==='terms'){
         title.textContent='Términos y condiciones';
         body.innerHTML=`<h4>1. Uso del menú digital</h4>
@@ -1261,6 +1337,6 @@
 
     init().catch(err=>{
       console.error(err);
-      $catalog.innerHTML='<div class="empty-state"><span class="em">⚠️</span><p>Error cargando catálogo</p></div>';
+      $catalog.innerHTML=`<div class="empty-state"><span class="em">⚠️</span><p>${t('Error cargando catálogo')}</p></div>`;
     });
   })();

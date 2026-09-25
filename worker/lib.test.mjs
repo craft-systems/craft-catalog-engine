@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { resolveSlug, render, trackingTags, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType } from "./src/lib.js";
+import { resolveSlug, render, trackingTags, SHELL_EN, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType } from "./src/lib.js";
 
 const env = { MENUS: { get: async (k) => (k === "domain:pedidos.pizza.com" ? "pizzaplanet" : null) } };
 
@@ -98,4 +98,15 @@ test("sanitizeBrandSub permite solo spans de color de marca", () => {
     '<span style="color:#fff">Más</span> <span style="color:var(--primary)">Sabor.</span>',
   );
   assert.equal(sanitizeBrandSub('<img src=x onerror=alert(1)>'), '&lt;img src=x onerror=alert(1)&gt;');
+});
+
+test("SHELL_EN: cada texto existe en template.html y locale en traduce el shell; sin locale no cambia", async () => {
+  const { readFileSync } = await import("node:fs");
+  const tpl = readFileSync(new URL("./template.html", import.meta.url), "utf8");
+  for (const [es] of SHELL_EN) assert.ok(tpl.includes(es), `falta en template: ${es}`);
+  const cfg = { store_name: "S" };
+  assert.equal(render(tpl, cfg, "{}", ""), render(tpl, { ...cfg, locale: "es" }, "{}", ""));
+  const en = render(tpl, { ...cfg, locale: "en" }, "{}", "");
+  assert.match(en, /<html lang="en">/);
+  for (const w of ["Tu Pedido", "Realizar pedido", "Retiro en local", "Ver mi carrito", "Confirmar pedido"]) assert.ok(!en.includes(w), w);
 });

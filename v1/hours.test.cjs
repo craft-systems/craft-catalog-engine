@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const src=fs.readFileSync(require.resolve('./catalog.js'),'utf8');
 // Ejecuta las funciones reales del motor sin DOM ni red.
 const code=src.slice(src.indexOf('    function storeHoursState('),src.indexOf('    /* ── CATEGORY STRIP'));
-const context=vm.createContext({config:{}});
+const context=vm.createContext({config:{},isEN:()=>false});
 vm.runInContext(code,context);
 const hours={tz:'America/Guayaquil',allow_preorders:true,weekly:{0:[['12:30','20:30']],1:[['15:00','22:00']],2:[['15:00','22:00']],3:[['15:00','22:00']],4:[['15:00','22:00']],5:[['15:00','23:00']],6:[['12:30','22:00']]}};
 test('horario definitivo, límites y próxima apertura',()=>{
