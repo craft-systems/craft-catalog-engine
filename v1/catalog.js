@@ -388,7 +388,8 @@
       }
       if(activeFilter==='__offers__'){
         setActiveChip(null);
-        renderFlat(products.filter(p=>((isPromo(p)&&promoActiveToday(p))||isOffer(p))&&matchSearch(p)),'Ofertas','🏷️','No hay ofertas activas ahora mismo.');
+        // Ofertas: TODAS las promos (el gate de día solo aplica al banner) + productos con precio_promo.
+        renderFlat(products.filter(p=>(isPromo(p)||isOffer(p))&&matchSearch(p)),'Ofertas','🏷️','No hay ofertas activas ahora mismo.');
         return;
       }
 
