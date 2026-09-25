@@ -8,6 +8,7 @@
     let config = {};
     let coverage = null;
   const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
+  const trackingScriptURL = new URL('tracking.js?v=tracking-v4', document.currentScript.src).href;
   let checkoutBusy = false;
   async function orderCheckout(){
     if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
@@ -17,6 +18,11 @@
       document.head.append(script);
     }));
     return window.CraftOrderCheckout;
+  }
+  async function webTracking(){
+    if(window.CraftWebTracking)return window.CraftWebTracking;
+    await (window.craftTrackingLoading ||= new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=trackingScriptURL;script.onload=resolve;script.onerror=()=>{window.craftTrackingLoading=null;script.remove();reject(new Error('No se pudo cargar tracking'));};document.head.append(script);}));
+    return window.CraftWebTracking;
   }
     const geoScriptURL=new URL('geo.js',document.currentScript.src).href;
     const needsCoverage=()=>Array.isArray(config.location?.sedes)&&config.location.sedes.some(s=>s?.lat!=null&&s?.lng!=null&&Number(s.radio_km)>0);
@@ -859,12 +865,18 @@
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
       if(address) msg+=`*Dirección:* ${address}\n`;
       msg+=sedeNote()+`\n${location.href}`;
+      const trackPurchase=()=>{
+        const tracking=config.tracking||{};
+        if(!(tracking.meta_pixel_id||tracking.tiktok_pixel_id))return;
+        webTracking().then(client=>{client.configure(tracking);client.purchase({event_id:crypto.randomUUID(),currency:/^[A-Z]{3}$/.test(cur)?cur:'USD',value:total,items:cartItems.map(i=>({item_id:String(i.id),item_name:i.nombre,quantity:i.qty,price:i.precio}))});}).catch(()=>{});
+      };
       if(config.catalog_notify_url && config.catalog_notify_token){
         checkoutBusy = true;
         const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
         const label = button?.textContent;
         if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
         try {
+          trackPurchase();
           const checkout = await orderCheckout();
           await checkout.submit({url:config.catalog_notify_url,payload,phone:num,message:msg,
             container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body});
@@ -872,6 +884,7 @@
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
+      trackPurchase();
       window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
     }
 
@@ -1059,6 +1072,7 @@
       // Legacy (Pages estático): cae al fetch de config.json. Retrocompatible.
       if(window.__CONFIG__){ config=window.__CONFIG__; }
       else{ try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){} }
+      if(config.tracking?.gtm_container_id) webTracking().then(client=>client.configure(config.tracking)).catch(()=>{});
 
       if(needsCoverage()){
         try{

@@ -15,7 +15,7 @@ export async function resolveSlug(host, env) {
   return env.MENUS.get(`domain:${host}`);
 }
 
-export function render(tpl, cfg, cfgRaw, theme) {
+export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-catalog-engine.pages.dev/v1") {
   const primary = cfg.theme_primary || (cfg.theme && cfg.theme.primary) || "#E4801C";
   const accent = cfg.theme_accent || (cfg.theme && cfg.theme.accent) || "#F5B301";
   const store = cfg.store_name || "Catálogo";
@@ -24,6 +24,9 @@ export function render(tpl, cfg, cfgRaw, theme) {
     ? `<link href="${esc(cfg.fonts)}" rel="stylesheet"/>`
     : `<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>`;
   return tpl
+    .replace("<!--TRACKING_HEAD-->", trackingTags(cfg).head)
+    .replace("<!--TRACKING_NOSCRIPT-->", trackingTags(cfg).noscript)
+    .replace("<!--ENGINE_ORIGIN-->", esc(engineOrigin))
     .replace("<!--TITLE-->", esc(cfg.site_title || store))
     .replace("<!--FAVICON-->", esc(cfg.favicon || ""))
     .replace("<!--FONTS-->", fonts)
@@ -40,6 +43,35 @@ export function render(tpl, cfg, cfgRaw, theme) {
       ? '<script src="https://craft-catalog-engine.pages.dev/v1/geo.js" defer></script>' : '')
     .replace("<!--CONFIG-->", `window.__CONFIG__=${jsonInline(cfgRaw)}`);
 }
+
+// Las etiquetas se renderizan en el HTML inicial: Pixel Helper las detecta y
+// el motor conserva fallback dinámico para catálogos legacy estáticos.
+export function trackingTags(cfg) {
+  const t = cfg?.tracking || {};
+  const meta = validPixelID(t.meta_pixel_id) ? t.meta_pixel_id : "";
+  const tiktok = validPixelID(t.tiktok_pixel_id) ? t.tiktok_pixel_id : "";
+  const gtm = validGTMID(t.gtm_container_id) ? t.gtm_container_id : "";
+  const head = [];
+  const noscript = [];
+  if (gtm) {
+    const id = JSON.stringify(gtm);
+    head.push(`<!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});w.__craftGtmLoaded=true;var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',${id});</script><!-- End Google Tag Manager -->`);
+    noscript.push(`<!-- Google Tag Manager (noscript) --><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${esc(gtm)}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><!-- End Google Tag Manager (noscript) -->`);
+  }
+  if (meta) {
+    const id = JSON.stringify(meta);
+    head.push(`<!-- Meta Pixel Code --><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',${id});window.__craftMetaPixelID=${id};fbq('track','PageView');</script><!-- End Meta Pixel Code -->`);
+    noscript.push(`<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${esc(meta)}&ev=PageView&noscript=1"/></noscript>`);
+  }
+  if (tiktok) {
+    const id = JSON.stringify(tiktok);
+    head.push(`<!-- TikTok Pixel Code --><script>!function(w,d,t){w.TiktokAnalyticsObject=t;var q=w[t]=w[t]||[];q.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie','holdConsent','revokeConsent','grantConsent'];q.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat([].slice.call(arguments,0)))}};for(var i=0;i<q.methods.length;i++)q.setAndDefer(q,q.methods[i]);q.load=function(e){var r='https://analytics.tiktok.com/i18n/pixel/events.js';q._i=q._i||{},q._i[e]=[],q._i[e]._u=r,q._t=q._t||{},q._t[e]=+new Date,q._o=q._o||{},q._o[e]={};var n=d.createElement('script');n.type='text/javascript',n.async=!0,n.src=r+'?sdkid='+e+'&lib='+t;d.getElementsByTagName('script')[0].parentNode.insertBefore(n,d.getElementsByTagName('script')[0])};q.load(${id});q.page();w.__craftTikTokPixelID=${id}}(window,document,'ttq');</script><!-- End TikTok Pixel Code -->`);
+  }
+  return { head: head.join("\n"), noscript: noscript.join("\n") };
+}
+
+const validPixelID = (id) => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id);
+const validGTMID = (id) => typeof id === "string" && /^GTM-[A-Z0-9]+$/.test(id);
 
 export function safeParse(s) {
   try { return JSON.parse(s); } catch { return {}; }
@@ -97,7 +129,7 @@ export async function handle(url, env, template) {
   const cfgRaw = await env.MENUS.get(`${slug}:config`);
   if (cfgRaw == null) return notFound();
   const theme = (await env.MENUS.get(`${slug}:theme`)) || "";
-  return okHtml(render(template, safeParse(cfgRaw), cfgRaw, theme));
+  return okHtml(render(template, safeParse(cfgRaw), cfgRaw, theme, env.ENGINE_ORIGIN || undefined));
 }
 
 // siteFile: elige el archivo del mapa de la tienda para un pathname, con índice de directorio

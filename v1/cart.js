@@ -65,6 +65,7 @@ if(typeof document !== 'undefined'){ (function(){
   const $ = id => document.getElementById(id);
   const state = { items: [], products: [], config: {}, storageKey: 'craft_cart' };
   const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
+  const trackingScriptURL = new URL('tracking.js?v=tracking-v4', document.currentScript.src).href;
   let checkoutBusy = false;
   async function orderCheckout(){
     if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
@@ -74,6 +75,11 @@ if(typeof document !== 'undefined'){ (function(){
       document.head.append(script);
     }));
     return window.CraftOrderCheckout;
+  }
+  async function webTracking(){
+    if(window.CraftWebTracking) return window.CraftWebTracking;
+    await (window.craftTrackingLoading ||= new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=trackingScriptURL;script.onload=resolve;script.onerror=()=>{window.craftTrackingLoading=null;script.remove();reject(new Error('No se pudo cargar tracking'));};document.head.append(script);}));
+    return window.CraftWebTracking;
   }
   const geoScriptURL = new URL('geo.js', document.currentScript.src).href;
   let coverage = null;
@@ -194,28 +200,27 @@ if(typeof document !== 'undefined'){ (function(){
       latitude: coverage?.coordinates?.lat, longitude: coverage?.coordinates?.lng,
     };
     const msg = buildOrderMessage(state.items, state.config, fields) + (coverage ? coverage.note() : '') + `\n${location.href}`;
+    const trackPurchase=()=>{
+      const tracking=state.config.tracking||{};
+      if(!(tracking.meta_pixel_id||tracking.tiktok_pixel_id))return;
+      webTracking().then(client=>{client.configure(tracking);client.purchase({event_id:crypto.randomUUID(),currency:/^[A-Z]{3}$/.test(state.config.currency||'')?state.config.currency:'USD',value:payload.total,items:state.items.map(i=>({item_id:String(i.id),item_name:i.nombre,quantity:i.qty,price:i.precio}))});}).catch(()=>{});
+    };
       if(state.config.catalog_notify_url && state.config.catalog_notify_token){
         checkoutBusy = true;
         const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
         const label = button?.textContent;
         if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
         try {
+          trackPurchase();
           const checkout = await orderCheckout();
           await checkout.submit({url:state.config.catalog_notify_url,payload,phone:num,message:msg,
             container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body});
-          trackCheckout();
         } catch(error) { toast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
+    trackPurchase();
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
-    trackCheckout();
-    function trackCheckout(){
-    if(window.dataLayer) window.dataLayer.push({ event: 'whatsapp_checkout', ecommerce: {
-      value: cartTotalPrice(state.items), currency: 'USD',
-      items: state.items.map(i => ({ item_id: i.id, item_name: i.nombre, quantity: i.qty, price: i.precio }))
-    }});
-    }
   }
 
   // delegación de eventos genéricos (markup bespoke, handlers genéricos)
@@ -248,6 +253,7 @@ if(typeof document !== 'undefined'){ (function(){
   function init({ products, config, storageKey } = {}){
     state.products = products || [];
     state.config = config || {};
+    if(state.config.tracking?.gtm_container_id) webTracking().then(client => client.configure(state.config.tracking)).catch(() => {});
     if(needsCoverage()){
       const ready = () => { coverage = window.CraftGeo.create(state.config); };
       if(window.CraftGeo) ready();

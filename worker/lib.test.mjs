@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { resolveSlug, render, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType } from "./src/lib.js";
+import { resolveSlug, render, trackingTags, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType } from "./src/lib.js";
 
 const env = { MENUS: { get: async (k) => (k === "domain:pedidos.pizza.com" ? "pizzaplanet" : null) } };
 
@@ -73,6 +73,15 @@ test("render inyecta tokens/config y escapa XSS", () => {
   assert.ok(out.includes("body{color:red}")); // theme inline
   assert.ok(out.includes("window.__CONFIG__="));
   assert.ok(!out.includes("<title>A\"><script>x")); // el título escapado, no rompe el head
+});
+
+test("trackingTags emite etiquetas estándar y descarta IDs inválidos", () => {
+  const tags = trackingTags({ tracking: { meta_pixel_id: "1216337266007176", tiktok_pixel_id: "D0HCDTBC77U0QQJ0ADPG", gtm_container_id: "GTM-WJDC95F" } });
+  assert.match(tags.head, /connect\.facebook\.net\/en_US\/fbevents\.js/);
+  assert.match(tags.head, /analytics\.tiktok\.com\/i18n\/pixel\/events\.js/);
+  assert.match(tags.head, /googletagmanager\.com\/gtm\.js/);
+  assert.match(tags.noscript, /googletagmanager\.com\/ns\.html\?id=GTM-WJDC95F/);
+  assert.equal(trackingTags({ tracking: { meta_pixel_id: '<script>', gtm_container_id: 'GTM-<bad>' } }).head, "");
 });
 
 test("jsonInline neutraliza cierre de script", () => {
