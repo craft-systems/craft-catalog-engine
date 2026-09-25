@@ -30,7 +30,7 @@
       return { ...receipt, reset(){ attempts.delete(storageKey); try { sessionStorage.removeItem(storageKey); } catch {} } };
     } finally { clearTimeout(timeout); }
   }
-  async function submit({url, payload, phone, message, container}){
+  async function submit({url, payload, phone, message, container, onSuccess}){
     if(busy) return;
     busy = true;
     document.getElementById('craftOrderReceipt')?.remove();
@@ -47,6 +47,7 @@
       const next = document.createElement('button'); next.type = 'button'; next.className = 'btn'; next.textContent = 'Crear otro pedido';
       next.addEventListener('click', () => { receipt.reset(); box.remove(); });
       box.append(title, note, link, next); container.append(box); box.scrollIntoView?.({block:'nearest', behavior:'smooth'});
+      try { onSuccess?.(receipt); } catch {} // solo tras registro confirmado; un fallo del callback no rompe el pedido
       return receipt;
     } finally { busy = false; }
   }

@@ -65,7 +65,6 @@ if(typeof document !== 'undefined'){ (function(){
   const $ = id => document.getElementById(id);
   const state = { items: [], products: [], config: {}, storageKey: 'craft_cart' };
   const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
-  const trackingScriptURL = new URL('tracking.js?v=tracking-v4', document.currentScript.src).href;
   let checkoutBusy = false;
   async function orderCheckout(){
     if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
@@ -76,12 +75,21 @@ if(typeof document !== 'undefined'){ (function(){
     }));
     return window.CraftOrderCheckout;
   }
-  async function webTracking(){
-    if(window.CraftWebTracking) return window.CraftWebTracking;
-    await (window.craftTrackingLoading ||= new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=trackingScriptURL;script.onload=resolve;script.onerror=()=>{window.craftTrackingLoading=null;script.remove();reject(new Error('No se pudo cargar tracking'));};document.head.append(script);}));
-    return window.CraftWebTracking;
-  }
   const geoScriptURL = new URL('geo.js', document.currentScript.src).href;
+  // Tracking opt-in: tracking.js se carga solo si config.tracking existe; los eventos previos a la carga se encolan.
+  const trackingScriptURL = new URL('tracking.js', document.currentScript.src).href;
+  let tracker = null, trackQueue = [];
+  const track = (name, detail) => { try { tracker ? tracker.track(name, detail) : trackQueue?.push([name, detail]); } catch(e){} };
+  function initTracking(){
+    if(!state.config.tracking || typeof state.config.tracking !== 'object'){ trackQueue = null; return; }
+    const ready = () => { try { tracker = window.CraftTracking.create(state.config); tracker.track('PageView'); trackQueue.forEach(e => tracker.track(...e)); } catch(e){ tracker = null; } trackQueue = null; };
+    if(window.CraftTracking) return ready();
+    const s = document.createElement('script'); s.src = trackingScriptURL; s.onload = ready; s.onerror = () => { trackQueue = null; }; document.head.append(s);
+  }
+  function view(id){
+    const p = state.products.find(x => String(x.id) === String(id));
+    if(p) track('ViewContent', { contents: [{ id: p.id, nombre: p.nombre, precio: resolveVariantPrice(p) }] });
+  }
   let coverage = null;
   const needsCoverage = () => Array.isArray(state.config.location?.sedes) && state.config.location.sedes.some(s => s?.lat != null && s?.lng != null && Number(s.radio_km) > 0);
   function requireCoverage(){
@@ -115,6 +123,7 @@ if(typeof document !== 'undefined'){ (function(){
       state.items.push({ key, id, nombre: p.nombre, precio: resolveVariantPrice(p, variantes), qty, variantes: variantes || {}, imagen: imgs[0] });
     }
     commit(); toast(`${p.nombre} agregado`);
+    track('AddToCart', { contents: [{ ...find(key), qty }] });
   }
   function removeOne(key){
     const it = find(key); if(!it) return;
@@ -162,6 +171,7 @@ if(typeof document !== 'undefined'){ (function(){
   function step2(){
     if(!state.items.length) return;
     if(!requireCoverage()) return;
+    track('InitiateCheckout', { contents: state.items });
     const s2 = $('cartStep2'); if(!s2){ checkout(); return; }  // sin form → checkout directo
     if($('cartItems')) $('cartItems').style.display = 'none';
     drawer()?.querySelector('.cart-footer')?.style.setProperty('display', 'none');
@@ -200,32 +210,36 @@ if(typeof document !== 'undefined'){ (function(){
       latitude: coverage?.coordinates?.lat, longitude: coverage?.coordinates?.lng,
     };
     const msg = buildOrderMessage(state.items, state.config, fields) + (coverage ? coverage.note() : '') + `\n${location.href}`;
-    const trackPurchase=()=>{
-      const tracking=state.config.tracking||{};
-      if(!(tracking.meta_pixel_id||tracking.tiktok_pixel_id))return;
-      webTracking().then(client=>{client.configure(tracking);client.purchase({event_id:crypto.randomUUID(),currency:/^[A-Z]{3}$/.test(state.config.currency||'')?state.config.currency:'USD',value:payload.total,items:state.items.map(i=>({item_id:String(i.id),item_name:i.nombre,quantity:i.qty,price:i.precio}))});}).catch(()=>{});
-    };
       if(state.config.catalog_notify_url && state.config.catalog_notify_token){
         checkoutBusy = true;
         const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
         const label = button?.textContent;
         if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
         try {
-          trackPurchase();
           const checkout = await orderCheckout();
           await checkout.submit({url:state.config.catalog_notify_url,payload,phone:num,message:msg,
-            container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body});
+            container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body,
+            onSuccess: receipt => track('Purchase', { contents: state.items, value: payload.total, order_id: receipt.id })});
+          trackCheckout();
         } catch(error) { toast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
-    trackPurchase();
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+    // Sin registro en craft-crm: el "envío" es abrir wa.me; popup bloqueado (null) => sin Purchase.
+    if(window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank')) track('Purchase', { contents: state.items, value: payload.total });
+    trackCheckout();
+    function trackCheckout(){
+    if(window.dataLayer) window.dataLayer.push({ event: 'whatsapp_checkout', ecommerce: {
+      value: cartTotalPrice(state.items), currency: 'USD',
+      items: state.items.map(i => ({ item_id: i.id, item_name: i.nombre, quantity: i.qty, price: i.precio }))
+    }});
+    }
   }
 
   // delegación de eventos genéricos (markup bespoke, handlers genéricos)
   document.addEventListener('click', e => {
     const rm = e.target.closest('.cart-item-remove'); if(rm){ e.stopPropagation(); del(rm.dataset.key); return; }
+    const v = e.target.closest('[data-open]'); if(v) view(v.dataset.open); // convención de los shells: [data-open] abre el modal
     const a = e.target.closest('[data-add]'); if(a){ e.preventDefault(); add(a.dataset.add, {}, 1); return; }
     const q = e.target.closest('[data-action]');
     if(q){ e.stopPropagation(); const { action, id, key } = q.dataset;
@@ -253,7 +267,6 @@ if(typeof document !== 'undefined'){ (function(){
   function init({ products, config, storageKey } = {}){
     state.products = products || [];
     state.config = config || {};
-    if(state.config.tracking?.gtm_container_id) webTracking().then(client => client.configure(state.config.tracking)).catch(() => {});
     if(needsCoverage()){
       const ready = () => { coverage = window.CraftGeo.create(state.config); };
       if(window.CraftGeo) ready();
@@ -267,10 +280,10 @@ if(typeof document !== 'undefined'){ (function(){
     try{ const s = JSON.parse(localStorage.getItem(state.storageKey) || '[]'); if(Array.isArray(s)) state.items = s; }catch(e){}
     // descarta ítems de productos que ya no existen
     state.items = state.items.filter(ci => state.products.find(p => String(p.id) === String(ci.id)));
-    bind(); renderDrawer(); emit();
+    bind(); renderDrawer(); emit(); initTracking();
   }
 
-  window.CraftCart = { init, add, removeOne, del, open, close, formatPrice: fmt, get items(){ return state.items; } };
+  window.CraftCart = { init, add, removeOne, del, open, close, view, formatPrice: fmt, get items(){ return state.items; } };
 })(); }
 
 // export para tests en node (inerte en navegador)

@@ -8,7 +8,6 @@
     let config = {};
     let coverage = null;
   const orderScriptURL = new URL('order-checkout.js', document.currentScript.src).href;
-  const trackingScriptURL = new URL('tracking.js?v=tracking-v4', document.currentScript.src).href;
   let checkoutBusy = false;
   async function orderCheckout(){
     if(window.CraftOrderCheckout) return window.CraftOrderCheckout;
@@ -19,10 +18,15 @@
     }));
     return window.CraftOrderCheckout;
   }
-  async function webTracking(){
-    if(window.CraftWebTracking)return window.CraftWebTracking;
-    await (window.craftTrackingLoading ||= new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=trackingScriptURL;script.onload=resolve;script.onerror=()=>{window.craftTrackingLoading=null;script.remove();reject(new Error('No se pudo cargar tracking'));};document.head.append(script);}));
-    return window.CraftWebTracking;
+  // Tracking opt-in: tracking.js se carga solo si config.tracking existe; los eventos previos a la carga se encolan.
+  const trackingScriptURL = new URL('tracking.js', document.currentScript.src).href;
+  let tracker = null, trackQueue = [];
+  const track = (name, detail) => { try { tracker ? tracker.track(name, detail) : trackQueue?.push([name, detail]); } catch(e){} };
+  function initTracking(){
+    if(!config.tracking || typeof config.tracking !== 'object'){ trackQueue = null; return; }
+    const ready = () => { try { tracker = window.CraftTracking.create(config); tracker.track('PageView'); trackQueue.forEach(e => tracker.track(...e)); } catch(e){ tracker = null; } trackQueue = null; };
+    if(window.CraftTracking) return ready();
+    const s = document.createElement('script'); s.src = trackingScriptURL; s.onload = ready; s.onerror = () => { trackQueue = null; }; document.head.append(s);
   }
     const geoScriptURL=new URL('geo.js',document.currentScript.src).href;
     const needsCoverage=()=>Array.isArray(config.location?.sedes)&&config.location.sedes.some(s=>s?.lat!=null&&s?.lng!=null&&Number(s.radio_km)>0);
@@ -208,6 +212,7 @@
       if(existing) existing.qty+=qty;
       else cartItems.push({key,id,nombre:p.nombre,precio:getEffectivePrice(p,variantes),qty,variantes:variantes||{},imagen:getImages(p)[0]||''});
       saveCart();updateCartUI();updateCardButtons();showToast('Agregado al pedido');
+      track('AddToCart',{contents:[{...cartFind(key),qty}]});
     }
     function cartRemoveOne(key){
       const item=cartFind(key);if(!item) return;
@@ -524,6 +529,7 @@
     /* ── PRODUCT MODAL ── */
     function openModal(id){
       const p=products.find(x=>String(x.id)===String(id));if(!p) return;
+      track('ViewContent',{contents:[{id:p.id,nombre:p.nombre,precio:getEffectivePrice(p)}]});
       modalProduct=p;modalQty=1;modalVariants={};modalDist={};modalRepeat={};modalCombo={};sliderImages=getImages(p);sliderIdx=0;
       $sliderTrack.innerHTML=sliderImages.length
         ?sliderImages.map(src=>`<div class="slider-slide"><img src="${src}" alt="${p.nombre}" loading="lazy"/></div>`).join('')
@@ -820,6 +826,7 @@
       if(!cartItems.length) return;
       if(!requireCoverage())return;
       if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||'Estamos cerrados ahora');return;}
+      track('InitiateCheckout',{contents:cartItems});
       $cartItems.style.display='none';
       document.querySelector('.cart-footer').style.display='none';
       document.getElementById('cartStep2').style.display='flex';
@@ -865,27 +872,22 @@
       msg+=`*Cliente:* ${name}\n*Teléfono:* ${phone}\n`;
       if(address) msg+=`*Dirección:* ${address}\n`;
       msg+=sedeNote()+`\n${location.href}`;
-      const trackPurchase=()=>{
-        const tracking=config.tracking||{};
-        if(!(tracking.meta_pixel_id||tracking.tiktok_pixel_id))return;
-        webTracking().then(client=>{client.configure(tracking);client.purchase({event_id:crypto.randomUUID(),currency:/^[A-Z]{3}$/.test(cur)?cur:'USD',value:total,items:cartItems.map(i=>({item_id:String(i.id),item_name:i.nombre,quantity:i.qty,price:i.precio}))});}).catch(()=>{});
-      };
       if(config.catalog_notify_url && config.catalog_notify_token){
         checkoutBusy = true;
         const button = document.getElementById('btnConfirm') || document.getElementById('btnCheckout');
         const label = button?.textContent;
         if(button){ button.disabled = true; button.textContent = 'Registrando pedido…'; }
         try {
-          trackPurchase();
           const checkout = await orderCheckout();
           await checkout.submit({url:config.catalog_notify_url,payload,phone:num,message:msg,
-            container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body});
+            container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body,
+            onSuccess:receipt=>track('Purchase',{contents:cartItems,value:total,order_id:receipt.id})});
         } catch(error) { showToast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
-      trackPurchase();
-      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+      // Sin registro en craft-crm: el "envío" es abrir wa.me; popup bloqueado (null) => sin Purchase.
+      if(window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank')) track('Purchase',{contents:cartItems,value:total});
     }
 
     /* ── BOTTOM NAV ── */
@@ -1072,8 +1074,6 @@
       // Legacy (Pages estático): cae al fetch de config.json. Retrocompatible.
       if(window.__CONFIG__){ config=window.__CONFIG__; }
       else{ try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){} }
-      if(config.tracking?.gtm_container_id) webTracking().then(client=>client.configure(config.tracking)).catch(()=>{});
-
       if(needsCoverage()){
         try{
           if(!window.CraftGeo)await new Promise((resolve,reject)=>{
@@ -1158,6 +1158,7 @@
 
       const res=await fetch('productos.json',{cache:'no-store'});
       products=await res.json();
+      initTracking();
 
       buildCatStrip();
       loadCart();loadFavs();

@@ -48,8 +48,8 @@ export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-ca
 // el motor conserva fallback dinámico para catálogos legacy estáticos.
 export function trackingTags(cfg) {
   const t = cfg?.tracking || {};
-  const meta = validPixelID(t.meta_pixel_id) ? t.meta_pixel_id : "";
-  const tiktok = validPixelID(t.tiktok_pixel_id) ? t.tiktok_pixel_id : "";
+  const meta = validMetaPixelID(t.meta_pixel_id) ? t.meta_pixel_id : "";
+  const tiktok = validTikTokPixelID(t.tiktok_pixel_id) ? t.tiktok_pixel_id : "";
   const gtm = validGTMID(t.gtm_container_id) ? t.gtm_container_id : "";
   const head = [];
   const noscript = [];
@@ -60,18 +60,19 @@ export function trackingTags(cfg) {
   }
   if (meta) {
     const id = JSON.stringify(meta);
-    head.push(`<!-- Meta Pixel Code --><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',${id});window.__craftMetaPixelID=${id};fbq('track','PageView');</script><!-- End Meta Pixel Code -->`);
+    head.push(`<!-- Meta Pixel Code --><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',${id});window.__craftMetaPixelID=${id};</script><!-- End Meta Pixel Code -->`);
     noscript.push(`<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${esc(meta)}&ev=PageView&noscript=1"/></noscript>`);
   }
   if (tiktok) {
     const id = JSON.stringify(tiktok);
-    head.push(`<!-- TikTok Pixel Code --><script>!function(w,d,t){w.TiktokAnalyticsObject=t;var q=w[t]=w[t]||[];q.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie','holdConsent','revokeConsent','grantConsent'];q.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat([].slice.call(arguments,0)))}};for(var i=0;i<q.methods.length;i++)q.setAndDefer(q,q.methods[i]);q.load=function(e){var r='https://analytics.tiktok.com/i18n/pixel/events.js';q._i=q._i||{},q._i[e]=[],q._i[e]._u=r,q._t=q._t||{},q._t[e]=+new Date,q._o=q._o||{},q._o[e]={};var n=d.createElement('script');n.type='text/javascript',n.async=!0,n.src=r+'?sdkid='+e+'&lib='+t;d.getElementsByTagName('script')[0].parentNode.insertBefore(n,d.getElementsByTagName('script')[0])};q.load(${id});q.page();w.__craftTikTokPixelID=${id}}(window,document,'ttq');</script><!-- End TikTok Pixel Code -->`);
+    head.push(`<!-- TikTok Pixel Code --><script>!function(w,d,t){w.TiktokAnalyticsObject=t;var q=w[t]=w[t]||[];q.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie','holdConsent','revokeConsent','grantConsent'];q.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat([].slice.call(arguments,0)))}};for(var i=0;i<q.methods.length;i++)q.setAndDefer(q,q.methods[i]);q.load=function(e){var r='https://analytics.tiktok.com/i18n/pixel/events.js';q._i=q._i||{},q._i[e]=[],q._i[e]._u=r,q._t=q._t||{},q._t[e]=+new Date,q._o=q._o||{},q._o[e]={};var n=d.createElement('script');n.type='text/javascript',n.async=!0,n.src=r+'?sdkid='+e+'&lib='+t;d.getElementsByTagName('script')[0].parentNode.insertBefore(n,d.getElementsByTagName('script')[0])};q.load(${id});w.__craftTikTokPixelID=${id}}(window,document,'ttq');</script><!-- End TikTok Pixel Code -->`);
   }
   return { head: head.join("\n"), noscript: noscript.join("\n") };
 }
 
-const validPixelID = (id) => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id);
-const validGTMID = (id) => typeof id === "string" && /^GTM-[A-Z0-9]+$/.test(id);
+const validMetaPixelID = (id) => typeof id === "string" && /^\d{5,20}$/.test(id);
+const validTikTokPixelID = (id) => typeof id === "string" && /^[A-Za-z0-9]{8,32}$/.test(id);
+const validGTMID = (id) => typeof id === "string" && /^GTM-[A-Z0-9]{4,12}$/.test(id);
 
 export function safeParse(s) {
   try { return JSON.parse(s); } catch { return {}; }
