@@ -94,10 +94,12 @@
     });
     function track(name, detail){
       if(!GTM_NAMES[name]) return null;
+	  if(name === 'PageView' && root.__craftPageViewEventID) return root.__craftPageViewEventID;
       // Purchase con order_id => event_id determinista: un reintento que recupera el mismo pedido no duplica.
       const id = String(detail && detail.event_id || (name === 'Purchase' && detail && detail.order_id ? 'purchase-' + detail.order_id : newId()));
       if(seen.has(id)) return id;
       seen.add(id);
+	  if(name === 'PageView') root.__craftPageViewEventID = id;
       const p = buildPayload(name, detail, tc, id);
       if(tc.meta_pixel_id && typeof root.fbq === 'function') safe(() => root.fbq('track', name, name === 'PageView' ? {} : {
         content_type: 'product', content_ids: p.contents.map(i => i.product_id), content_name: p.name,

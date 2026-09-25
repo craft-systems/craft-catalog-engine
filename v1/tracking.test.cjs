@@ -100,6 +100,16 @@ test('dedup: un Purchase del mismo order_id (reintento que recupera el pedido) n
   assert.equal(metaEvents(ctx).length, 1);
 });
 
+test('dedup: dos motores en la misma página emiten un solo PageView', () => {
+  const {ctx, run} = env(); run('tracking.js');
+  const a = ctx.CraftTracking.create({tracking: IDS});
+  const b = ctx.CraftTracking.create({tracking: IDS});
+  assert.equal(a.track('PageView'), b.track('PageView'));
+  assert.deepEqual(metaEvents(ctx).map(a => a[1]), ['PageView']);
+  assert.deepEqual(tiktokEvents(ctx).map(a => a[0]), ['page']);
+  assert.deepEqual(gtmEvents(ctx).map(e => e.event), ['page_view']);
+});
+
 test('respeta un pixel/GTM ya presente en el shell: no inyecta scripts duplicados', () => {
   const calls = [];
   const {ctx, scripts, run} = env();
