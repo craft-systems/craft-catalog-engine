@@ -30,7 +30,7 @@ el Worker los inyecta por SSR (`template.html` + `lib.js render()`). Si agregás
 tócalo en AMBOS (motor + Worker) para que funcione en edge y legacy.
 
 ### Tracking (opt-in, `v1/tracking.js`)
-Bloque opcional `tracking` en config: `{meta_pixel_id, tiktok_pixel_id, gtm_id, currency}`. Sin bloque =
+Bloque opcional `tracking` en config: `{meta_pixel_id, tiktok_pixel_id, gtm_container_id, currency}` (`gtm_id` se acepta solo en runtime; el SSR del Worker lee `gtm_container_id`). Sin bloque =
 cero requests extra (default). `catalog.js` (menús) y `cart.js` (tiendas) cargan `tracking.js` diferido solo
 si `config.tracking` es objeto; IDs inválidos se ignoran (Meta: dígitos; TikTok: alfanumérico; GTM: `GTM-XXXX`,
 **solo el ID, nunca snippets HTML**). `currency` default: `config.currency` si es ISO, `"$"` ⇒ `USD`.
@@ -39,8 +39,8 @@ InitiateCheckout (paso 2 del checkout), Purchase (solo tras registro exitoso en 
 `order_id`=`receipt.id` y `event_id`=`purchase-<id>`; sin craft-crm, solo si `wa.me` abrió). TikTok mapea
 Purchase→`CompletePayment`; GTM recibe nombres GA4 (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`) con
 `ecommerce` + `craft_event`/`event_id`. El Worker no necesita SSR: `window.__CONFIG__` ya lleva el bloque.
-Durabilidad: `PATCH /catalog/menu/config {"patch":{"tracking":{…}}}` (menús; el sync mergea y lo preserva);
-en tiendas va en el `config.json` local (publish-edge lo sobrescribe en KV).
+Fuente de verdad: **Integraciones del negocio en craft-crm** (`business_integrations`). Cada sync reescribe
+`tracking` en KV desde ahí y lo **borra** si está vacío — no ponerlo vía `PATCH /menu/config` ni en `config.json`.
 
 ## Contrato del motor — NO romper
 No cambies los IDs/clases del shell que `catalog.js` usa: `brandLogo, brandName, heroTitle, heroNotice,
