@@ -30,25 +30,60 @@
       return { ...receipt, reset(){ attempts.delete(storageKey); try { sessionStorage.removeItem(storageKey); } catch {} } };
     } finally { clearTimeout(timeout); }
   }
+  function waLink(phone, label, receipt, message){
+    return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(`*Pedido ${label}*\n[CraftOrder:${receipt.id}]\n${message}`)}`;
+  }
+  // Pestaña puente: hay que abrirla DURANTE el gesto del usuario. Si se abriera después del
+  // `await` del registro, el navegador la bloquea como popup y el cliente quedaría obligado a
+  // un clic extra ("Continuar por WhatsApp"), que es justo la fricción que se elimina.
+  function openBridge(){
+    let w = null;
+    try { w = root.open('about:blank', '_blank'); } catch {}
+    if(!w) return null;
+    try {
+      w.document.write('<!doctype html><meta charset="utf-8"><title>Abriendo WhatsApp…</title>' +
+        '<body style="margin:0;display:grid;place-items:center;height:100vh;background:#fff;' +
+        'color:#555;font:600 15px system-ui,sans-serif">Abriendo WhatsApp…</body>');
+      w.document.close();
+    } catch {}
+    return w;
+  }
+  function goTo(tab, href){
+    if(tab){ // pestaña puente ya autorizada por el gesto: nadie bloquea esta redirección
+      try { tab.location.replace(href); return true; } catch {}
+      try { tab.location.href = href; return true; } catch {}
+    }
+    try { root.location.href = href; return true; } catch {}
+    return false;
+  }
   async function submit({url, payload, phone, message, container, onSuccess}){
     if(busy) return;
     busy = true;
     document.getElementById('craftOrderReceipt')?.remove();
+    const tab = openBridge();
     try {
       const receipt = await register(url, payload);
       const label = '#' + String(receipt.order_number).padStart(6, '0');
+      const href = waLink(phone, label, receipt, message);
+      // Sin clics extra: el pedido ya está registrado y se sigue directo a WhatsApp con el
+      // nº y el UUID inyectados en el mensaje.
+      goTo(tab, href);
+      // Recibo compacto: queda como comprobante del nº si el cliente vuelve al menú y como
+      // respaldo navegable si el navegador hubiera bloqueado la apertura.
       const box = document.createElement('section'); box.id = 'craftOrderReceipt';
       box.setAttribute('role', 'status'); box.style.cssText = 'padding:16px;margin:12px 0;border:1px solid currentColor;border-radius:12px;display:grid;gap:12px';
       const title = document.createElement('strong'); title.textContent = `Pedido ${label} registrado`;
-      const note = document.createElement('span'); note.textContent = 'Conserva este número. Continúa por WhatsApp para coordinar tu pedido.';
+      const note = document.createElement('span'); note.textContent = 'Te llevamos a WhatsApp para coordinar tu pedido. Si no se abrió, usa el botón.';
       const link = document.createElement('a'); link.className = 'btn btn-primary'; link.textContent = 'Continuar por WhatsApp';
-      link.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(`*Pedido ${label}*\n[CraftOrder:${receipt.id}]\n${message}`)}`;
-      link.target = '_blank'; link.rel = 'noopener';
+      link.href = href; link.target = '_blank'; link.rel = 'noopener';
       const next = document.createElement('button'); next.type = 'button'; next.className = 'btn'; next.textContent = 'Crear otro pedido';
       next.addEventListener('click', () => { receipt.reset(); box.remove(); });
-      box.append(title, note, link, next); container.append(box); box.scrollIntoView?.({block:'nearest', behavior:'smooth'});
+      box.append(title, note, link, next); container.append(box); box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
       try { onSuccess?.(receipt); } catch {} // solo tras registro confirmado; un fallo del callback no rompe el pedido
       return receipt;
+    } catch (error) {
+      try { tab?.close(); } catch {} // no dejar una pestaña en blanco si el registro falló
+      throw error;
     } finally { busy = false; }
   }
   root.CraftOrderCheckout = { register, submit };
