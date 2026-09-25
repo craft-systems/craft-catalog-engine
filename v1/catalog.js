@@ -461,6 +461,9 @@
       setupIntersectionObserver();
     }
 
+    // ¿El negocio ofrece reservas? El motor no lo asume: se activa/desactiva por config
+    // (`location.reserva === false`), igual que el resto de la personalización por cliente.
+    const reservasActivas=()=>(config.location||{}).reserva!==false;
     function renderLocation(){
       document.body.classList.add('location-view');
       if(observer) observer.disconnect();
@@ -517,22 +520,33 @@
       const mapEmbed=config.location&&config.location.map_embed;
       const mapHTML=mapEmbed?`<div class="location-map"><iframe src="${mapEmbed}" style="border:0" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="Ubicación"></iframe></div>`:'';
 
+      // Copy de la vista de ubicación: SIEMPRE desde config. El motor es el esqueleto y no
+      // lleva texto de ningún cliente; los defaults son genéricos y `location_intro` es el
+      // campo de marca que escribe el onboarding. Una clave vacía omite el elemento.
+      const locCfg=config.location||{};
+      const locHeading=locCfg.heading!==undefined?locCfg.heading:'📍 Nuestra Ubicación';
+      const locIntro=locCfg.intro!==undefined?locCfg.intro:(config.location_intro||'');
+      const resTitulo=locCfg.reserva_titulo||'📅 Haz una reserva';
+      const resSub=locCfg.reserva_sub||'Cuéntanos cuándo vienes y te confirmamos por WhatsApp';
+      const reservasOn=reservasActivas();
+
       $catalog.innerHTML=`
         <section class="location-view-wrap">
           <div class="location-heading">
-            <h2>📍 Nuestra Ubicación</h2>
-            <p>Ven a disfrutar la mejor smash burger artesanal.</p>
+            ${locHeading?`<h2>${locHeading}</h2>`:''}
+            ${locIntro?`<p>${locIntro}</p>`:''}
           </div>
           <div class="sedes-grid">${allCards}</div>
           ${mapHTML}
           ${socialHTML}
-          <div class="location-reserve">
-            <h3 class="reserve-heading">📅 Haz una reserva</h3>
-            <p class="reserve-subheading">Cuéntanos cuándo vienes y te confirmamos por WhatsApp</p>
+          ${reservasOn?`<div class="location-reserve">
+            <h3 class="reserve-heading">${resTitulo}</h3>
+            <p class="reserve-subheading">${resSub}</p>
             ${reservationFormHTML()}
-          </div>
+          </div>`:''}
         </section>`;
-      setupReserveForm($catalog.querySelector('.location-reserve'));
+      const reserveEl=$catalog.querySelector('.location-reserve');
+      if(reserveEl) setupReserveForm(reserveEl);
     }
 
     function updateCardButtons(){
@@ -1078,6 +1092,7 @@
       if(document.getElementById('closedOverlay')) return;
       const el=document.createElement('div');
       el.id='closedOverlay';el.className='closed-overlay';
+      const conReservas=reservasActivas();
       el.innerHTML=`<div class="closed-modal">
         <div class="closed-icon">🌙</div>
         <h2 class="closed-title">Estamos cerrados</h2>
@@ -1085,18 +1100,20 @@
         <p class="closed-sub"></p>
         <div class="closed-btns">
           <button class="btn-closed-browse">Ten mi pedido listo</button>
-          <button class="btn-closed-reserve">📅 Hacer una reserva</button>
+          ${conReservas?'<button class="btn-closed-reserve">📅 Hacer una reserva</button>':''}
         </div>
-        <div class="closed-reserve-wrap" style="display:none">${reservationFormHTML()}</div>
+        ${conReservas?`<div class="closed-reserve-wrap" style="display:none">${reservationFormHTML()}</div>`:''}
       </div>`;
       document.body.appendChild(el);
       el.querySelector('.closed-msg').textContent=(config.hours&&config.hours.closed_msg)||'Vuelve en nuestro horario de atención.';
       el.querySelector('.closed-sub').textContent=preorderNote()||'Puedes explorar el menú y pedir dentro del horario de atención.';
       el.querySelector('.btn-closed-browse').addEventListener('click',()=>el.classList.remove('open'));
-      el.querySelector('.btn-closed-reserve').addEventListener('click',()=>{
-        const w=el.querySelector('.closed-reserve-wrap');w.style.display=w.style.display==='none'?'':'none';
-      });
-      setupReserveForm(el.querySelector('.closed-reserve-wrap'));
+      if(conReservas){
+        el.querySelector('.btn-closed-reserve').addEventListener('click',()=>{
+          const w=el.querySelector('.closed-reserve-wrap');w.style.display=w.style.display==='none'?'':'none';
+        });
+        setupReserveForm(el.querySelector('.closed-reserve-wrap'));
+      }
       requestAnimationFrame(()=>el.classList.add('open'));
     }
 
