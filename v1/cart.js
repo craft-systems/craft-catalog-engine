@@ -172,7 +172,6 @@ if(typeof document !== 'undefined'){ (function(){
   }
   function step2(){
     if(!state.items.length) return;
-    if(!requireCoverage()) return;
     track('InitiateCheckout', { contents: state.items });
     const s2 = $('cartStep2'); if(!s2){ checkout(); return; }  // sin form → checkout directo
     if($('cartItems')) $('cartItems').style.display = 'none';
@@ -188,7 +187,8 @@ if(typeof document !== 'undefined'){ (function(){
 
   async function checkout(){
       if(checkoutBusy) return;
-    if(!requireCoverage()) return;
+    // Ubicación solo a domicilio, al confirmar (ya elegido el modo).
+    if((document.querySelector('.dtog-btn.active')?.dataset.mode || 'delivery') === 'delivery' && !requireCoverage()) return;
     const num = coverage ? coverage.phone() : (state.config.whatsapp_number || '').replace(/\D/g, '');
     if(!num){ alert('Número de WhatsApp no configurado'); return; }
     if(!state.items.length) return;
@@ -268,7 +268,7 @@ if(typeof document !== 'undefined'){ (function(){
     state.products = products || [];
     state.config = config || {};
     if(needsCoverage()){
-      const ready = () => { coverage = window.CraftGeo.create(state.config); };
+      const ready = () => { coverage = window.CraftGeo.create(state.config, { mount: $('fieldAddressWrap') }); };
       if(window.CraftGeo) ready();
       else{
         const script = document.createElement('script'); script.src = geoScriptURL;

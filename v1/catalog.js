@@ -1190,7 +1190,7 @@
             const script=document.createElement('script');script.src=geoScriptURL;
             script.onload=resolve;script.onerror=reject;document.head.append(script);
           });
-          coverage=window.CraftGeo.create(config);
+          coverage=window.CraftGeo.create(config,{mount:document.getElementById('fieldAddressWrap')});
         }catch{showToast(t('No se pudo cargar el selector de ubicación. Recarga para reintentar.'));}
       }
 
