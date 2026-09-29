@@ -932,7 +932,6 @@
     }
     function goToStep2(){
       if(!cartItems.length) return;
-      if(!requireCoverage())return;
       if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||t('Estamos cerrados ahora'));return;}
       track('InitiateCheckout',{contents:cartItems});
       $cartItems.style.display='none';
@@ -948,7 +947,8 @@
     /* ── WHATSAPP CHECKOUT ── */
     async function checkout(){
       if(checkoutBusy) return;
-      if(!requireCoverage())return;
+      // La ubicación solo se exige a domicilio (retiro/mesa no la necesitan); se pide al confirmar, ya elegido el modo.
+      if(currentMode()==='delivery'&&!requireCoverage())return;
       const num=orderPhone();
       if(!num){showToast(t('WhatsApp no configurado'));return;}
       const name=document.getElementById('fieldName').value.trim();
