@@ -26,7 +26,7 @@
       'Sabores':'Flavors','Personaliza':'Customize','— Elige una opción —':'— Choose an option —','Opciones':'Options','Salsa':'Sauce',
       'Reparte {0} — faltan {1}':'Choose {0} — {1} left','Elige {0} {1}s':'Choose {0} {1}s',
       'Selecciona todas las opciones':'Please select all options','Producto agotado':'Sold out',
-      '{0} item(s) · {1} producto(s)':'{0} item(s) · {1} product(s)','Empaque':'Packaging',
+      '{0} item(s) · {1} producto(s)':'{0} item(s) · {1} product(s)','Empaque':'Packaging','Envío':'Delivery fee',
       'Tu pedido está vacío':'Your order is empty','Quitar':'Remove','¿Algo más?':'Anything else?',
       'Tu Pedido':'Your Order','Estamos cerrados ahora':'We’re closed right now','Datos de entrega':'Your details',
       'WhatsApp no configurado':'WhatsApp is not set up','Completa tu nombre y teléfono':'Please enter your name and phone',
@@ -299,6 +299,10 @@
       const cost=+p.cost||0; if(cost<=0) return 0;
       return p.mode==='per_unit' ? cost*billable.reduce((s,i)=>s+i.qty,0) : cost;
     }
+    // Recargos del pedido [etiqueta, monto]: empaque + envío fijo (config.delivery_fee, solo domicilio; opt-in).
+    const orderFees=mode=>[[t((config.packaging&&config.packaging.label)||'Empaque'),packagingFee(mode)],
+      [t('Envío'),mode==='delivery'&&cartItems.length?(+config.delivery_fee||0):0]].filter(f=>f[1]>0);
+    const feesTotal=mode=>orderFees(mode).reduce((s,f)=>s+f[1],0);
     // Calendario local del negocio; incluye la madrugada perteneciente al día anterior.
     function storeHoursState(h,now=new Date()){
       if(!h||!h.weekly||!Object.keys(h.weekly).length) return {open:true,preorder:false,next:''};
@@ -851,7 +855,7 @@
 
     /* ── CART UI ── */
     function updateCartUI(){
-      const qty=cartTotalQty(),fee=packagingFee(currentMode()),total=cartTotalPrice()+fee;
+      const qty=cartTotalQty(),fee=feesTotal(currentMode()),total=cartTotalPrice()+fee;
       $navBadge.textContent=qty;$navBadge.classList.toggle('show',qty>0);
       $peekCount.textContent=qty;$peekTotal.textContent=formatPrice(total);
       const sheetOpen=$cartDrawer.classList.contains('open');
@@ -860,12 +864,12 @@
       $cartItemCount.textContent=t('{0} item(s) · {1} producto(s)',qty,cartItems.length);
       $btnCheckout.disabled=qty===0||storeClosed;
 
-      // Línea de empaque en el footer (creada al vuelo; el HTML del cliente no la trae).
+      // Líneas de recargos (empaque/envío) en el footer (creadas al vuelo; el HTML del cliente no las trae).
       let feeLine=document.getElementById('cartFeeLine');
       const footer=$cartTotal.closest('.cart-footer');
       if(fee>0&&qty>0){
-        if(!feeLine&&footer){feeLine=document.createElement('div');feeLine.id='cartFeeLine';feeLine.className='cart-fee';footer.insertBefore(feeLine,footer.firstChild);}
-        if(feeLine) feeLine.innerHTML=`<span>${t((config.packaging&&config.packaging.label)||'Empaque')}</span><span>${formatPrice(fee)}</span>`;
+        if(!feeLine&&footer){feeLine=document.createElement('div');feeLine.id='cartFeeLine';footer.insertBefore(feeLine,footer.firstChild);}
+        if(feeLine) feeLine.innerHTML=orderFees(currentMode()).map(([l,v])=>`<div class="cart-fee"><span>${l}</span><span>${formatPrice(v)}</span></div>`).join('');
       }else if(feeLine){feeLine.remove();}
 
       renderCrossSell();
@@ -952,12 +956,11 @@
       if(!name||!phone){showToast(t('Completa tu nombre y teléfono'));return;}
       if(mode==='delivery'&&!address){showToast(t('Ingresa tu dirección de entrega'));return;}
       if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||t('Estamos cerrados ahora'));return;}
-      const fee=packagingFee(mode),cur=config.currency||'$',store=config.store_name||'Catálogo';
-      const total=cartTotalPrice()+fee;
-      const pkgLabel=t((config.packaging&&config.packaging.label)||'Empaque');
+      const fees=orderFees(mode),cur=config.currency||'$',store=config.store_name||'Catálogo';
+      const total=cartTotalPrice()+feesTotal(mode);
 
       const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:[variantLabel(i.variantes),i.nota&&`${t('Nota:')} ${i.nota}`].filter(Boolean).join(' · ')||undefined}));
-      if(fee>0) notifyItems.push({nombre:pkgLabel,qty:1,precio:fee});
+      fees.forEach(([nombre,precio])=>notifyItems.push({nombre,qty:1,precio}));
       const payload={ token:config.catalog_notify_token, store_name:store, items:notifyItems,
         total,currency:cur,client_name:name,client_phone:phone,delivery_mode:mode,address:address||undefined,
         store_url:location.href,latitude:coverage?.coordinates?.lat,longitude:coverage?.coordinates?.lng };
@@ -968,7 +971,7 @@
         const vLabel=variantLabel(item.variantes);
         msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n${item.nota?`  📝 ${item.nota}\n`:''}  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
       });
-      if(fee>0) msg+=`▸ ${pkgLabel}\n  ${formatPrice(fee)}\n`;
+      fees.forEach(([l,v])=>{msg+=`▸ ${l}\n  ${formatPrice(v)}\n`;});
       msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
       msg+=`${t('*ENTREGA:*')} ${t(mode==='delivery'?'Domicilio':mode==='mesa'?'Mesa':'Retiro en local')}\n`;
       msg+=`${t('*Cliente:*')} ${name}\n${t('*Teléfono:*')} ${phone}\n`;
@@ -1076,7 +1079,7 @@
       document.querySelectorAll('.dtog-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('fieldAddressWrap').style.display=btn.dataset.mode==='delivery'?'':'none';
-      updateCartUI(); // mesa exime empaque → recalcula total
+      updateCartUI(); // mesa exime empaque, retiro/mesa eximen envío → recalcula total
     });
     $modalOverlay.addEventListener('click',e=>{if(e.target===$modalOverlay) closeModal();});
     $modalClose.addEventListener('click',closeModal);
