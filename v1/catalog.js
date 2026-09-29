@@ -14,7 +14,7 @@
       'No se pudo comprobar la cobertura. Recarga el menú para reintentar.':'Could not check delivery coverage. Reload the menu to try again.',
       'Opción':'Option','Agotado':'Sold out','¡Quedan pocas!':'Only a few left!',
       'Quitado de favoritos':'Removed from favorites','❤ Agregado a favoritos':'❤ Added to favorites',
-      'Stock insuficiente':'Not enough stock','Agregado al pedido':'Added to your order',
+      'Stock insuficiente':'Not enough stock','Nota (opcional): sin cebolla, huevo revuelto…':'Note (optional): no onion, scrambled eggs…','Nota para este producto':'Note for this item','Nota:':'Note:','Agregado al pedido':'Added to your order',
       'Pedido anticipado para la próxima apertura: {0}. Lo despachamos apenas abramos.':'Pre-order for our next opening: {0}. We’ll prepare it as soon as we open.',
       'Todo':'All','Categorías anteriores':'Previous categories','Más categorías':'More categories',
       'Oferta':'Deal','Favorito':'Favorite','Elegir opciones':'Choose options','Agregar':'Add','Ver oferta':'View deal',
@@ -93,7 +93,7 @@
     let categorySlugs = [];
     let storeClosed = false;    // fuera de horario (config.hours) → bloquea el checkout, no la navegación
 
-    let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, modalCombo = {}, sliderIdx = 0, sliderImages = [];
+    let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, modalCombo = {}, modalNote = '', sliderIdx = 0, sliderImages = [];
 
     /* ── DOM REFS ── */
     const $catalog=document.getElementById('catalog'),$searchInput=document.getElementById('searchInput'),
@@ -188,6 +188,7 @@
     // distribute guarda la variante como objeto {label,price}; extraer el texto o coacciona a "[object Object]".
     const vDisp=x=>(x&&typeof x==='object')?(x.label||x.name||''):(x??'');
     const cartKey=(id,v)=>(!v||!Object.keys(v).length)?String(id):id+':'+Object.entries(v).sort().map(([k,x])=>k+'='+vDisp(x)).join(',');
+    const esc=s=>String(s).replace(/[&<>"']/g,c=>`&#${c.charCodeAt(0)};`);
     const variantLabel=v=>(!v||!Object.keys(v).length)?'':Object.entries(v).map(([,x])=>vDisp(x)).filter(Boolean).join(' · ');
 
     function getStockInfo(p){
@@ -254,14 +255,15 @@
 
     /* ── CART LOGIC ── */
     const cartFind=key=>cartItems.find(i=>i.key===key);
-    function cartAdd(id,variantes,qty){
+    // nota: texto libre del cliente ("Sin cebolla"); misma nota suma qty, nota distinta = línea aparte.
+    function cartAdd(id,variantes,qty,nota=''){
       const p=products.find(x=>String(x.id)===String(id));
       if(!p) return;
-      const stock=getStockInfo(p),key=cartKey(id,variantes),existing=cartFind(key);
-      const newQty=(existing?existing.qty:0)+qty;
+      const stock=getStockInfo(p),key=cartKey(id,variantes)+(nota?'#'+nota:''),existing=cartFind(key);
+      const newQty=cartItems.filter(ci=>String(ci.id)===String(id)).reduce((s,ci)=>s+ci.qty,0)+qty;
       if(newQty>stock.maxQty){showToast(t('Stock insuficiente'));return;}
       if(existing) existing.qty+=qty;
-      else cartItems.push({key,id,nombre:p.nombre,precio:getEffectivePrice(p,variantes),qty,variantes:variantes||{},imagen:getImages(p)[0]||''});
+      else cartItems.push({key,id,nombre:p.nombre,precio:getEffectivePrice(p,variantes),qty,variantes:variantes||{},nota,imagen:getImages(p)[0]||''});
       saveCart();updateCartUI();updateCardButtons();showToast(t('Agregado al pedido'));
       track('AddToCart',{contents:[{...cartFind(key),qty}]});
     }
@@ -415,7 +417,7 @@
     function actionHTML(p,inCartQty,hasVariants,stock){
       if(!hasVariants&&inCartQty>0){
         return `<div class="qty-control">
-            <button data-action="dec" data-id="${p.id}" data-key="${cartKey(p.id,{})}">−</button>
+            <button data-action="dec" data-id="${p.id}" data-key="${esc(cartItems.filter(ci=>String(ci.id)===String(p.id)).pop()?.key??cartKey(p.id,{}))}">−</button>
             <span class="qty-val">${inCartQty}</span>
             <button data-action="inc" data-id="${p.id}" ${!stock.canAdd||inCartQty>=stock.maxQty?'disabled':''}>+</button>
           </div>`;
@@ -627,7 +629,7 @@
     function openModal(id){
       const p=products.find(x=>String(x.id)===String(id));if(!p) return;
       track('ViewContent',{contents:[{id:p.id,nombre:p.nombre,precio:getEffectivePrice(p)}]});
-      modalProduct=p;modalQty=1;modalVariants={};modalDist={};modalRepeat={};modalCombo={};sliderImages=getImages(p);sliderIdx=0;
+      modalProduct=p;modalQty=1;modalVariants={};modalDist={};modalRepeat={};modalCombo={};modalNote='';sliderImages=getImages(p);sliderIdx=0;
       $sliderTrack.innerHTML=sliderImages.length
         ?sliderImages.map(src=>`<div class="slider-slide"><img src="${src}" alt="${p.nombre}" loading="lazy"/></div>`).join('')
         :`<div class="slider-slide"><span class="slider-placeholder">${catIcon((p.categorias||[])[0],p.nombre)}</span></div>`;
@@ -744,6 +746,7 @@
         ${variantHTML}
         ${hasVariants&&!allSelected?`<p class="modal-variant-hint">${dist?t('Reparte {0} — faltan {1}',dist.total,dist.total-distSum):(combo?t('Elige {0} {1}s',combo.pick,combo.item.toLowerCase()):t('Selecciona todas las opciones'))}</p>`:''}
         ${!stock.canAdd&&allSelected?`<p class="modal-stock-hint">${t('Producto agotado')}</p>`:''}
+        <div class="form-field"><textarea id="modalNote" rows="2" maxlength="140" aria-label="${t('Nota para este producto')}" placeholder="${t('Nota (opcional): sin cebolla, huevo revuelto…')}">${esc(modalNote)}</textarea></div>
         <div class="modal-actions">
           <div class="modal-qty">
             <button id="mqDec">−</button>
@@ -755,6 +758,7 @@
           </button>
         </div>`;
 
+      document.getElementById('modalNote').addEventListener('input',e=>{modalNote=e.target.value;});
       document.getElementById('mqDec').addEventListener('click',()=>{if(modalQty>1){modalQty--;renderModalDetail();}});
       document.getElementById('mqInc').addEventListener('click',()=>{
         if(modalQty>=stock.maxQty){showToast(t('Stock insuficiente'));return;}
@@ -773,7 +777,7 @@
         } else if(combo){
           v={};for(let k=0;k<combo.pick;k++) v['c'+k]=modalCombo[k];
         }
-        cartAdd(modalProduct.id,v,modalQty);closeModal();
+        cartAdd(modalProduct.id,v,modalQty,modalNote.trim());closeModal();
       });
       $modalDetail.querySelectorAll('.dist-pill').forEach(btn=>btn.addEventListener('click',e=>{
         const k=btn.dataset.dopt,cur=modalDist[k]||0;
@@ -877,9 +881,10 @@
           <div class="cart-item-info">
             <div class="cart-item-name">${item.nombre}</div>
             ${vLabel?`<div class="cart-item-variant">${vLabel}</div>`:''}
+            ${item.nota?`<div class="cart-item-variant">📝 ${esc(item.nota)}</div>`:''}
             <div class="cart-item-detail">${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}</div>
           </div>
-          <button class="cart-item-remove" data-key="${item.key}" title="${t('Quitar')}">✕</button>
+          <button class="cart-item-remove" data-key="${esc(item.key)}" title="${t('Quitar')}">✕</button>
         </div>`;
       }).join('');
     }
@@ -951,7 +956,7 @@
       const total=cartTotalPrice()+fee;
       const pkgLabel=t((config.packaging&&config.packaging.label)||'Empaque');
 
-      const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:variantLabel(i.variantes)||undefined}));
+      const notifyItems=cartItems.map(i=>({nombre:i.nombre,qty:i.qty,precio:i.precio,variant:[variantLabel(i.variantes),i.nota&&`${t('Nota:')} ${i.nota}`].filter(Boolean).join(' · ')||undefined}));
       if(fee>0) notifyItems.push({nombre:pkgLabel,qty:1,precio:fee});
       const payload={ token:config.catalog_notify_token, store_name:store, items:notifyItems,
         total,currency:cur,client_name:name,client_phone:phone,delivery_mode:mode,address:address||undefined,
@@ -961,7 +966,7 @@
       if(preorderNote())msg+=preorderNote()+'\n';
       cartItems.forEach(item=>{
         const vLabel=variantLabel(item.variantes);
-        msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
+        msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n${item.nota?`  📝 ${item.nota}\n`:''}  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
       });
       if(fee>0) msg+=`▸ ${pkgLabel}\n  ${formatPrice(fee)}\n`;
       msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
