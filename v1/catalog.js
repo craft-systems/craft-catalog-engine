@@ -272,6 +272,8 @@
       item.qty--;if(item.qty<=0) cartItems=cartItems.filter(i=>i.key!==key);
       saveCart();updateCartUI();updateCardButtons();
     }
+    // Pedido enviado: vaciar el carrito para que al volver al menú no reaparezca.
+    function clearCart(){cartItems=[];saveCart();updateCartUI();updateCardButtons();}
     function cartDelete(key){cartItems=cartItems.filter(i=>i.key!==key);saveCart();updateCartUI();updateCardButtons();}
     const saveCart=()=>{try{localStorage.setItem('menu_cart',JSON.stringify(cartItems));}catch(e){}};
     function loadCart(){try{const s=JSON.parse(localStorage.getItem('menu_cart')||'[]');if(Array.isArray(s))cartItems=s;}catch(e){}}
@@ -986,13 +988,13 @@
           const checkout = await orderCheckout();
           await checkout.submit({url:config.catalog_notify_url,payload,phone:num,message:msg,t,
             container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body,
-            onSuccess:receipt=>track('Purchase',{contents:cartItems,value:total,order_id:receipt.id})});
+            onSuccess:receipt=>{track('Purchase',{contents:cartItems,value:total,order_id:receipt.id});receipt.reset();clearCart();}});
         } catch(error) { showToast(t(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.')); }
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
       // Sin registro en craft-crm: el "envío" es abrir wa.me; popup bloqueado (null) => sin Purchase.
-      if(window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank')) track('Purchase',{contents:cartItems,value:total});
+      if(window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank')){track('Purchase',{contents:cartItems,value:total});clearCart();closeCart();}
     }
 
     /* ── BOTTOM NAV ── */

@@ -132,6 +132,8 @@ if(typeof document !== 'undefined'){ (function(){
   }
   function del(key){ state.items = state.items.filter(i => i.key !== key); commit(); }
   function commit(){ save(); renderDrawer(); emit(); }
+  // Pedido enviado: vaciar el carrito para que al volver al menú no reaparezca.
+  function clearCart(){ state.items = []; commit(); }
 
   function renderDrawer(){
     const qty = cartTotalQty(state.items);
@@ -219,15 +221,13 @@ if(typeof document !== 'undefined'){ (function(){
           const checkout = await orderCheckout();
           await checkout.submit({url:state.config.catalog_notify_url,payload,phone:num,message:msg,
             container:document.getElementById('cartStep2') || document.getElementById('cartDrawer') || document.body,
-            onSuccess: receipt => track('Purchase', { contents: state.items, value: payload.total, order_id: receipt.id })});
-          trackCheckout();
+            onSuccess: receipt => { track('Purchase', { contents: state.items, value: payload.total, order_id: receipt.id }); trackCheckout(); receipt.reset(); clearCart(); }});
         } catch(error) { toast(error.name === 'AbortError' ? 'La conexión tardó demasiado. Reintenta para recuperar tu número.' : error.message || 'No se pudo registrar el pedido. Reintenta.'); }
         finally { checkoutBusy = false; if(button){ button.disabled = false; button.textContent = label; } }
         return;
       }
     // Sin registro en craft-crm: el "envío" es abrir wa.me; popup bloqueado (null) => sin Purchase.
-    if(window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank')) track('Purchase', { contents: state.items, value: payload.total });
-    trackCheckout();
+    if(window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank')){ track('Purchase', { contents: state.items, value: payload.total }); trackCheckout(); clearCart(); }
     function trackCheckout(){
     if(window.dataLayer) window.dataLayer.push({ event: 'whatsapp_checkout', ecommerce: {
       value: cartTotalPrice(state.items), currency: 'USD',
