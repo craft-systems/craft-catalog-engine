@@ -29,7 +29,7 @@
       '{0} item(s) · {1} producto(s)':'{0} item(s) · {1} product(s)','Empaque':'Packaging','Envío':'Delivery fee',
       'Tu pedido está vacío':'Your order is empty','Quitar':'Remove','¿Algo más?':'Anything else?',
       'Tu Pedido':'Your Order','Estamos cerrados ahora':'We’re closed right now','Datos de entrega':'Your details',
-      'WhatsApp no configurado':'WhatsApp is not set up','Completa tu nombre y teléfono':'Please enter your name and phone',
+      'WhatsApp no configurado':'WhatsApp is not set up','Completa tu nombre y teléfono':'Please enter your name and phone','Completa: {0}':'Please fill in: {0}',
       'Ingresa tu dirección de entrega':'Please enter your delivery address',
       '¡Hola! Quiero hacer un pedido:':'Hi! I’d like to place an order:','¡Hola! Quiero pedir:':'Hi! I’d like to order:',
       '*PEDIDO — {0}*':'*ORDER — {0}*','*ENTREGA:*':'*ORDER TYPE:*','Domicilio':'Delivery','Mesa':'Dine-in','Retiro en local':'Pickup',
@@ -944,6 +944,31 @@
       document.getElementById('cartBack').style.display='';
     }
 
+    /* ── CAMPOS EXTRA DEL CHECKOUT (opt-in, config.checkout_fields) ── */
+    // [{id,label,required?,placeholder?,type?}] → inputs antes de la dirección; el valor viaja solo en el
+    // mensaje de WhatsApp. ponytail: sin persistir en craft-crm; agregar al payload si un cliente lo necesita en el CRM.
+    function renderExtraFields(){
+      const fields=Array.isArray(config.checkout_fields)?config.checkout_fields:[];
+      const anchor=document.getElementById('fieldAddressWrap');
+      fields.forEach(f=>{
+        if(!f||!f.id||!f.label)return;
+        const wrap=document.createElement('div');wrap.className='form-field';
+        const label=document.createElement('label');label.textContent=f.label+(f.required?' *':'');
+        const input=document.createElement('input');input.id='fieldX_'+f.id;input.type=f.type||'text';
+        input.placeholder=f.placeholder||'';input.dataset.label=f.label;if(f.required)input.dataset.required='1';
+        wrap.append(label,input);anchor.before(wrap);
+      });
+    }
+    function extraFieldValues(){
+      const out=[];
+      for(const el of document.querySelectorAll('[id^="fieldX_"]')){
+        const v=el.value.trim();
+        if(!v&&el.dataset.required){showToast(t('Completa: {0}',el.dataset.label));el.focus();return null;}
+        if(v)out.push([el.dataset.label,v]);
+      }
+      return out;
+    }
+
     /* ── WHATSAPP CHECKOUT ── */
     async function checkout(){
       if(checkoutBusy) return;
@@ -956,6 +981,7 @@
       const mode=document.querySelector('.dtog-btn.active')?.dataset.mode||'delivery';
       const address=mode==='delivery'?document.getElementById('fieldAddress').value.trim():'';
       if(!name||!phone){showToast(t('Completa tu nombre y teléfono'));return;}
+      const extras=extraFieldValues();if(!extras)return;
       if(mode==='delivery'&&!address){showToast(t('Ingresa tu dirección de entrega'));return;}
       if(checkoutBlocked()){showToast((config.hours&&config.hours.closed_msg)||t('Estamos cerrados ahora'));return;}
       const fees=orderFees(mode),cur=config.currency||'$',store=config.store_name||'Catálogo';
@@ -978,6 +1004,7 @@
       msg+=`${t('*ENTREGA:*')} ${t(mode==='delivery'?'Domicilio':mode==='mesa'?'Mesa':'Retiro en local')}\n`;
       msg+=`${t('*Cliente:*')} ${name}\n${t('*Teléfono:*')} ${phone}\n`;
       if(address) msg+=`${t('*Dirección:*')} ${address}\n`;
+      extras.forEach(([l,v])=>{msg+=`*${l}:* ${v}\n`;});
       msg+=sedeNote()+`\n${location.href}`;
       if(config.catalog_notify_url && config.catalog_notify_token){
         checkoutBusy = true;
@@ -1184,6 +1211,7 @@
       // Legacy (Pages estático): cae al fetch de config.json. Retrocompatible.
       if(window.__CONFIG__){ config=window.__CONFIG__; }
       else{ try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){} }
+      renderExtraFields();
       if(needsCoverage()){
         try{
           if(!window.CraftGeo)await new Promise((resolve,reject)=>{

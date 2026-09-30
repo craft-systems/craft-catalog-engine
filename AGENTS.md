@@ -42,6 +42,13 @@ Purchase→`CompletePayment`; GTM recibe nombres GA4 (`view_item`, `add_to_cart`
 Fuente de verdad: **Integraciones del negocio en craft-crm** (`business_integrations`). Cada sync reescribe
 `tracking` en KV desde ahí y lo **borra** si está vacío — no ponerlo vía `PATCH /menu/config` ni en `config.json`.
 
+### Campos extra del checkout (opt-in, `config.checkout_fields`)
+`[{id, label, required?, placeholder?, type?}]` → el motor agrega inputs en el paso 2 (antes de la dirección),
+bloquea el envío si falta uno `required` y los manda **solo en el mensaje de WhatsApp** (`*Label:* valor`),
+NO en el payload a craft-crm. Sin la clave = checkout igual que antes. Se carga con `PATCH /menu/config`; el
+sync la preserva. Solo menús (`catalog.js`); las tiendas (`cart.js`) no lo leen. Primer uso: Pizza Planet
+(Cédula/RUC, 2026-09-30). Si un cliente lo necesita guardado en el CRM: agregar `extra` a `OrderNotifyRequest`.
+
 ### Idioma (opt-in, `config.locale`)
 `locale: "en"` pone el menú completo en inglés; sin la clave (o `"es"`) todo queda byte-idéntico. Motor:
 diccionario `EN` en `catalog.js` con **la clave = el texto en español** y `t(texto, ...args)` (`{0}` = args);
