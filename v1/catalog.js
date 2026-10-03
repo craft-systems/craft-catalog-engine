@@ -91,6 +91,7 @@
     let activeFilter = 'all';   // 'all' | <slug> | '__offers__' | '__favs__'
     let searchQuery = '';
     let categorySlugs = [];
+    let activeBrand = '';       // filtro de marca (config.brand_filter): se combina con el chip activo
     let storeClosed = false;    // fuera de horario (config.hours) → bloquea el checkout, no la navegación
 
     let modalProduct = null, modalQty = 1, modalVariants = {}, modalDist = {}, modalRepeat = {}, modalCombo = {}, modalNote = '', sliderIdx = 0, sliderImages = [];
@@ -346,8 +347,16 @@
     function buildCatStrip(){
       const catMap=config.categories||{};
       categorySlugs=orderedCategorySlugs();
+      // Opt-in: config.brand_filter={prefix,label} saca las categorías con ese prefijo de los chips
+      // a un desplegable de marca entre el buscador y los chips. Sin config = no-op.
+      const bf=config.brand_filter,isBrand=s=>!!(bf&&bf.prefix&&s.startsWith(bf.prefix));
+      const brands=categorySlugs.filter(isBrand);
+      if(brands.length&&!document.getElementById('brandSelect')){
+        $catStrip.insertAdjacentHTML('beforebegin',`<div class="brand-filter"><select id="brandSelect" aria-label="${esc(bf.label||t('Marca'))}"><option value="">${esc(bf.label||t('Todas las marcas'))}</option>${brands.map(s=>`<option value="${esc(s)}">${esc(catLabel(catMap[s]||s))}</option>`).join('')}</select></div>`);
+        document.getElementById('brandSelect').addEventListener('change',e=>{activeBrand=e.target.value;renderCatalog();goTop();});
+      }
       let html=`<button class="cat-chip active" data-cat="all"><span class="ic">🔥</span><span class="lb">${t('Todo')}</span></button>`;
-      categorySlugs.forEach(slug=>{
+      categorySlugs.filter(s=>!isBrand(s)).forEach(slug=>{
         const name=catMap[slug]||slug;
         html+=`<button class="cat-chip" data-cat="${slug}"><span class="ic">${catIcon(slug,name)}</span><span class="lb">${catLabel(name)}</span></button>`;
       });
@@ -498,7 +507,8 @@
       const filtered=products.filter(p=>{
         if(isPromo(p)) return false; // promos van solo en el banner, no en el grid
         const matchCat=activeFilter==='all'||(p.categorias||[]).includes(activeFilter);
-        return matchCat&&matchSearch(p);
+        const matchBrand=!activeBrand||(p.categorias||[]).includes(activeBrand);
+        return matchCat&&matchBrand&&matchSearch(p);
       });
       const groups={};
       filtered.forEach(p=>{const c=(p.categorias||[])[0]||'';(groups[c]=groups[c]||[]).push(p);});

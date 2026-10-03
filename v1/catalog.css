@@ -90,6 +90,13 @@
     .search-box input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,.12)}
     .search-box svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--text-soft)}
 
+    /* Desplegable de marca (opt-in config.brand_filter) */
+    .brand-filter{margin:-4px 0 12px}
+    .brand-filter select{width:100%;appearance:none;-webkit-appearance:none;cursor:pointer;
+      padding:12px 42px 12px 16px;border-radius:var(--radius-sm);border:1px solid var(--border-2);
+      background:var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 14px center/16px;
+      color:var(--text);font-family:inherit;font-size:14px;font-weight:600}
+    .brand-filter select:focus{outline:none;border-color:var(--accent)}
     .cat-strip{display:flex;gap:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 2px 4px}
     .cat-strip::-webkit-scrollbar{display:none}
     /* Riel con flechas: solo se activa cuando las categorías NO caben (móvil). */
