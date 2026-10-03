@@ -14,7 +14,7 @@
       'No se pudo comprobar la cobertura. Recarga el menú para reintentar.':'Could not check delivery coverage. Reload the menu to try again.',
       'Opción':'Option','Agotado':'Sold out','¡Quedan pocas!':'Only a few left!',
       'Quitado de favoritos':'Removed from favorites','❤ Agregado a favoritos':'❤ Added to favorites',
-      'Stock insuficiente':'Not enough stock','Nota (opcional): sin cebolla, huevo revuelto…':'Note (optional): no onion, scrambled eggs…','Nota para este producto':'Note for this item','Nota:':'Note:','Agregado al pedido':'Added to your order',
+      'Stock insuficiente':'Not enough stock','Nota (opcional): sin cebolla, huevo revuelto…':'Note (optional): no onion, scrambled eggs…','Nota (opcional): sabor preferido, indicaciones…':'Note (optional): preferred flavor, instructions…','Nota para este producto':'Note for this item','Nota:':'Note:','Agregado al pedido':'Added to your order',
       'Pedido anticipado para la próxima apertura: {0}. Lo despachamos apenas abramos.':'Pre-order for our next opening: {0}. We’ll prepare it as soon as we open.',
       'Todo':'All','Categorías anteriores':'Previous categories','Más categorías':'More categories',
       'Oferta':'Deal','Favorito':'Favorite','Elegir opciones':'Choose options','Agregar':'Add','Ver oferta':'View deal',
@@ -230,8 +230,9 @@
       if(e) return e;
       const s=normalize(slug+' '+(name||''));
       for(const [k,ic] of CAT_ICONS) if(s.includes(normalize(k))) return ic;
-      return '🍽️';
+      return phIcon();
     }
+    const phIcon=()=>config.store_mode?'🛍️':'🍽️';
 
     let toastTimer;
     function showToast(msg){
@@ -762,7 +763,7 @@
         ${variantHTML}
         ${hasVariants&&!allSelected?`<p class="modal-variant-hint">${dist?t('Reparte {0} — faltan {1}',dist.total,dist.total-distSum):(combo?t('Elige {0} {1}s',combo.pick,combo.item.toLowerCase()):t('Selecciona todas las opciones'))}</p>`:''}
         ${!stock.canAdd&&allSelected?`<p class="modal-stock-hint">${t('Producto agotado')}</p>`:''}
-        <div class="form-field"><textarea id="modalNote" rows="2" maxlength="140" aria-label="${t('Nota para este producto')}" placeholder="${t('Nota (opcional): sin cebolla, huevo revuelto…')}">${esc(modalNote)}</textarea></div>
+        <div class="form-field"><textarea id="modalNote" rows="2" maxlength="140" aria-label="${t('Nota para este producto')}" placeholder="${t(config.store_mode?'Nota (opcional): sabor preferido, indicaciones…':'Nota (opcional): sin cebolla, huevo revuelto…')}">${esc(modalNote)}</textarea></div>
         <div class="modal-actions">
           <div class="modal-qty">
             <button id="mqDec">−</button>
@@ -893,7 +894,7 @@
       $cartItems.innerHTML=cartItems.map(item=>{
         const vLabel=variantLabel(item.variantes);
         return `<div class="cart-item">
-          ${item.imagen?`<img src="${item.imagen}" alt="${item.nombre}" loading="lazy"/>`:`<div class="ph">🍽️</div>`}
+          ${item.imagen?`<img src="${item.imagen}" alt="${item.nombre}" loading="lazy"/>`:`<div class="ph">${phIcon()}</div>`}
           <div class="cart-item-info">
             <div class="cart-item-name">${item.nombre}</div>
             ${vLabel?`<div class="cart-item-variant">${vLabel}</div>`:''}
@@ -923,7 +924,7 @@
           const hasV=Array.isArray(p.variantes)&&p.variantes.length>0,img=getImages(p)[0];
           const price=typeof p.precio==='number'?formatPrice(p.precio):(p.precio||'');
           return `<button class="xs-card" ${hasV?`data-open="${p.id}"`:`data-add="${p.id}"`} aria-label="${t('Agregar')} ${p.nombre}">
-            ${img?`<img src="${img}" alt="${p.nombre}" loading="lazy"/>`:`<div class="xs-ph">🍽️</div>`}
+            ${img?`<img src="${img}" alt="${p.nombre}" loading="lazy"/>`:`<div class="xs-ph">${phIcon()}</div>`}
             <div class="xs-name">${p.nombre}</div>
             <div class="xs-foot"><span class="xs-price">${price}</span><span class="xs-add">+</span></div>
           </button>`;
@@ -1221,6 +1222,8 @@
       // Legacy (Pages estático): cae al fetch de config.json. Retrocompatible.
       if(window.__CONFIG__){ config=window.__CONFIG__; }
       else{ try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok) config=await r.json();}catch(e){} }
+      // Opt-in config.store_mode: tienda (no restaurante) → sin entrega "Mesa", nota e ícono genéricos.
+      if(config.store_mode) document.querySelector('.dtog-btn[data-mode="mesa"]')?.remove();
       renderExtraFields();
       if(needsCoverage()){
         try{
@@ -1357,16 +1360,17 @@
       }
       if(type==='terms'){
         title.textContent='Términos y condiciones';
-        body.innerHTML=`<h4>1. Uso del menú digital</h4>
-          <p>Este menú digital es una herramienta informativa de ${store} para facilitar la recepción de pedidos a través de WhatsApp. La realización del pedido implica la aceptación de estos términos.</p>
+        const doc=config.store_mode?'catálogo digital':'menú digital';
+        body.innerHTML=`<h4>1. Uso del ${doc}</h4>
+          <p>Este ${doc} es una herramienta informativa de ${store} para facilitar la recepción de pedidos a través de WhatsApp. La realización del pedido implica la aceptación de estos términos.</p>
           <h4>2. Pedidos y pagos</h4>
           <p>Los pedidos se confirman únicamente a través de WhatsApp. Los precios están expresados en dólares americanos (USD) e incluyen IVA. ${store} se reserva el derecho de modificar precios sin previo aviso.</p>
           <h4>3. Entrega</h4>
           <p>El tiempo de entrega es estimado y puede variar según la demanda y la distancia. El costo de envío se acordará directamente con el cliente al confirmar el pedido.</p>
           <h4>4. Cancelaciones</h4>
-          <p>Una vez confirmado el pedido por WhatsApp, la cancelación queda sujeta a la aprobación del local. Los pedidos en proceso de preparación no admiten cancelación.</p>
+          <p>Una vez confirmado el pedido por WhatsApp, la cancelación queda sujeta a la aprobación ${config.store_mode?'de la tienda. Los pedidos ya despachados':'del local. Los pedidos en proceso de preparación'} no admiten cancelación.</p>
           <h4>5. Disponibilidad</h4>
-          <p>La disponibilidad de productos está sujeta al stock del local. ${store} no garantiza la disponibilidad de todos los productos en todo momento.</p>`;
+          <p>La disponibilidad de productos está sujeta al stock ${config.store_mode?'disponible':'del local'}. ${store} no garantiza la disponibilidad de todos los productos en todo momento.</p>`;
       } else {
         title.textContent='Política de privacidad';
         body.innerHTML=`<h4>1. Datos recopilados</h4>
