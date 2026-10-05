@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { resolveSlug, render, trackingTags, SHELL_EN, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType } from "./src/lib.js";
+import { resolveSlug, render, trackingTags, SHELL_EN, esc, jsonInline, sanitizeBrandSub, handle, siteFile, contentType, ogTags } from "./src/lib.js";
 
 const env = { MENUS: { get: async (k) => (k === "domain:pedidos.pizza.com" ? "pizzaplanet" : null) } };
 
@@ -49,6 +49,13 @@ test("handle: menú config-driven redirige rutas ≠ / a / (conserva query)", as
   assert.equal(out.status, 301);
   assert.equal(out.headers.location, "/?mesa=3");
   assert.equal((await handle(U("pizza.craft-systems.com", "/index.html"), env2, "TPL")).status, 200);
+});
+
+test("ogTags: og_image > logo, description opcional, escapa", () => {
+  const t = ogTags({ og_image: "https://m/x.jpg", logo: "https://m/l.png", og_description: 'a"b' }, "S");
+  assert.ok(t.includes('og:image" content="https://m/x.jpg"') && t.includes("a&quot;b"));
+  assert.ok(ogTags({ logo: "https://m/l.png" }, "S").includes("l.png"));
+  assert.ok(!ogTags({}, "S").includes("og:image"));
 });
 
 test("siteFile / contentType (con índice de directorio)", () => {

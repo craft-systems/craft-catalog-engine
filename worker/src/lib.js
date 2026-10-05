@@ -58,6 +58,7 @@ export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-ca
     .replace("<!--TRACKING_NOSCRIPT-->", trackingTags(cfg).noscript)
     .replace("<!--ENGINE_ORIGIN-->", esc(engineOrigin))
     .replace("<!--TITLE-->", esc(cfg.site_title || store))
+    .replace("<!--OG-->", ogTags(cfg, store))
     .replace("<!--FAVICON-->", esc(cfg.favicon || ""))
     .replace("<!--FONTS-->", fonts)
     .replace("<!--VARS-->", `:root{--primary:${esc(primary)};--accent:${esc(accent)}}`)
@@ -72,6 +73,18 @@ export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-ca
     .replace("<!--COVERAGE-->", Array.isArray(cfg.location?.sedes) && cfg.location.sedes.some(s => s?.id && Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.radio_km > 0)
       ? '<script src="https://craft-catalog-engine.pages.dev/v1/geo.js" defer></script>' : '')
     .replace("<!--CONFIG-->", `window.__CONFIG__=${jsonInline(cfgRaw)}`);
+}
+
+// Preview al compartir el link (WhatsApp/FB/Telegram leen el HTML inicial, no ejecutan JS).
+// og_image (JPG/PNG cuadrado ~630px) > logo; sin imagen no se emite og:image.
+export function ogTags(cfg, store) {
+  const img = cfg.og_image || cfg.logo, desc = cfg.og_description;
+  return [
+    `<meta property="og:type" content="website"/>`,
+    `<meta property="og:title" content="${esc(cfg.site_title || store)}"/>`,
+    desc && `<meta property="og:description" content="${esc(desc)}"/><meta name="description" content="${esc(desc)}"/>`,
+    img && `<meta property="og:image" content="${esc(img)}"/>`,
+  ].filter(Boolean).join("");
 }
 
 // Las etiquetas se renderizan en el HTML inicial: Pixel Helper las detecta y
