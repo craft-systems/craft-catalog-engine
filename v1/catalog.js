@@ -350,14 +350,15 @@
       categorySlugs=orderedCategorySlugs();
       // Opt-in: config.brand_filter={prefix,label} saca las categorías con ese prefijo de los chips
       // a un desplegable de marca entre el buscador y los chips. Sin config = no-op.
-      const bf=config.brand_filter,isBrand=s=>!!(bf&&bf.prefix&&s.startsWith(bf.prefix));
+      // brand_filter.group_prefix: categorías-sección (p.ej. sistemas de una marca) sin chip propio.
+      const bf=config.brand_filter,isBrand=s=>!!(bf&&bf.prefix&&s.startsWith(bf.prefix)),isGroup=s=>!!(bf&&bf.group_prefix&&s.startsWith(bf.group_prefix));
       const brands=categorySlugs.filter(isBrand);
       if(brands.length&&!document.getElementById('brandSelect')){
         $catStrip.insertAdjacentHTML('beforebegin',`<div class="brand-filter"><select id="brandSelect" aria-label="${esc(bf.label||t('Marca'))}"><option value="">${esc(bf.label||t('Todas las marcas'))}</option>${brands.map(s=>`<option value="${esc(s)}">${esc(catLabel(catMap[s]||s))}</option>`).join('')}</select></div>`);
         document.getElementById('brandSelect').addEventListener('change',e=>{activeBrand=e.target.value;renderCatalog();goTop();});
       }
       let html=`<button class="cat-chip active" data-cat="all"><span class="ic">🔥</span><span class="lb">${t('Todo')}</span></button>`;
-      categorySlugs.filter(s=>!isBrand(s)).forEach(slug=>{
+      categorySlugs.filter(s=>!isBrand(s)&&!isGroup(s)).forEach(slug=>{
         const name=catMap[slug]||slug;
         html+=`<button class="cat-chip" data-cat="${slug}"><span class="ic">${catIcon(slug,name)}</span><span class="lb">${catLabel(name)}</span></button>`;
       });
@@ -512,7 +513,9 @@
         return matchCat&&matchBrand&&matchSearch(p);
       });
       const groups={};
-      filtered.forEach(p=>{const c=(p.categorias||[])[0]||'';(groups[c]=groups[c]||[]).push(p);});
+      // Sección = primera categoría group_prefix si existe (el sync ordena categorias alfabéticamente).
+      const gp=(config.brand_filter||{}).group_prefix,cs=p=>p.categorias||[];
+      filtered.forEach(p=>{const c=(gp&&cs(p).find(s=>s.startsWith(gp)))||cs(p)[0]||'';(groups[c]=groups[c]||[]).push(p);});
 
       const catLabels=config.categories||{};
       // Banner de promos: solo en la vista 'all' sin búsqueda (como el hero de la referencia).
