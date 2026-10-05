@@ -159,6 +159,9 @@ export async function handle(url, env, template) {
   // Menú config-driven: render del template único con la config del cliente.
   const cfgRaw = await env.MENUS.get(`${slug}:config`);
   if (cfgRaw == null) return notFound();
+  // El menú vive solo en "/" (el motor pide productos.json relativo): cualquier otra ruta, p.ej. URLs
+  // viejas de un sitio bespoke (/pages/contacto.html), rompería la carga → 301 a "/" con su query.
+  if (url.pathname !== "/" && url.pathname !== "/index.html") return { status: 301, headers: { location: "/" + url.search }, body: "" };
   const theme = (await env.MENUS.get(`${slug}:theme`)) || "";
   return okHtml(render(template, safeParse(cfgRaw), cfgRaw, theme, env.ENGINE_ORIGIN || undefined));
 }

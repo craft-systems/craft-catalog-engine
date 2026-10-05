@@ -44,6 +44,13 @@ test("handle: sin {slug}:site rutea al render del menú", async () => {
   assert.ok(!out.body.includes("<!--TITLE-->"));
 });
 
+test("handle: menú config-driven redirige rutas ≠ / a / (conserva query)", async () => {
+  const out = await handle(U("pizza.craft-systems.com", "/pages/contacto.html?mesa=3"), env2, "TPL");
+  assert.equal(out.status, 301);
+  assert.equal(out.headers.location, "/?mesa=3");
+  assert.equal((await handle(U("pizza.craft-systems.com", "/index.html"), env2, "TPL")).status, 200);
+});
+
 test("siteFile / contentType (con índice de directorio)", () => {
   assert.equal(siteFile(store, "/").body, "<h1>home</h1>");
   assert.equal(siteFile(store, "/nope"), null);
