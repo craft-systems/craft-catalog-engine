@@ -56,6 +56,7 @@ test("ogTags: og_image > logo, description opcional, escapa", () => {
   assert.ok(t.includes('og:image" content="https://m/x.jpg"') && t.includes("a&quot;b"));
   assert.ok(ogTags({ logo: "https://m/l.png" }, "S").includes("l.png"));
   assert.ok(!ogTags({}, "S").includes("og:image"));
+  assert.ok(ogTags({ og_title: "NH", site_title: "largo" }, "S").includes('og:title" content="NH"'));
 });
 
 test("siteFile / contentType (con índice de directorio)", () => {

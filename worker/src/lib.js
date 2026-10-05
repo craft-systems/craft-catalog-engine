@@ -76,12 +76,12 @@ export function render(tpl, cfg, cfgRaw, theme, engineOrigin = "https://craft-ca
 }
 
 // Preview al compartir el link (WhatsApp/FB/Telegram leen el HTML inicial, no ejecutan JS).
-// og_image (JPG/PNG cuadrado ~630px) > logo; sin imagen no se emite og:image.
+// og_title corto (marca) > site_title (SEO); og_image (JPG/PNG cuadrado ~630px) > logo.
 export function ogTags(cfg, store) {
   const img = cfg.og_image || cfg.logo, desc = cfg.og_description;
   return [
     `<meta property="og:type" content="website"/>`,
-    `<meta property="og:title" content="${esc(cfg.site_title || store)}"/>`,
+    `<meta property="og:title" content="${esc(cfg.og_title || cfg.site_title || store)}"/>`,
     desc && `<meta property="og:description" content="${esc(desc)}"/><meta name="description" content="${esc(desc)}"/>`,
     img && `<meta property="og:image" content="${esc(img)}"/>`,
   ].filter(Boolean).join("");
