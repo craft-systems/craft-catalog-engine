@@ -535,8 +535,9 @@
     }
 
     // ¿El negocio ofrece reservas? El motor no lo asume: se activa/desactiva por config
-    // (`location.reserva === false`), igual que el resto de la personalización por cliente.
-    const reservasActivas=()=>(config.location||{}).reserva!==false;
+    // (`location.reserva`), igual que el resto de la personalización por cliente. Sin valor
+    // explícito: restaurantes sí, tiendas (store_mode) no.
+    const reservasActivas=()=>(config.location||{}).reserva??!config.store_mode;
     function renderLocation(){
       document.body.classList.add('location-view');
       if(observer) observer.disconnect();
