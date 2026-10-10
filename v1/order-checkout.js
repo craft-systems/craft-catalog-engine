@@ -33,7 +33,7 @@
   // t = traductor del motor (catalog.js, opt-in por config.locale); sin t, español con {0} interpolado.
   const fmt = (s, ...a) => s.replace(/\{(\d)\}/g, (_, i) => a[i]);
   function waLink(phone, label, receipt, message, t = fmt){
-    return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(`${t('*Pedido {0}*', label)}\n[CraftOrder:${receipt.id}]\n${message}`)}`;
+    return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(`${t('*Pedido {0}*', label)}\n${message}`)}`;
   }
   // Pestaña puente: hay que abrirla DURANTE el gesto del usuario. Si se abriera después del
   // `await` del registro, el navegador la bloquea como popup y el cliente quedaría obligado a
