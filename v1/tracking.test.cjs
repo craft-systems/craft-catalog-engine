@@ -133,12 +133,12 @@ test('order-checkout: onSuccess solo tras registro confirmado y su fallo no romp
   ok = true;
   await ctx.CraftOrderCheckout.submit(args(r => hits.push(r)));
   assert.equal(hits[0].id, 'abc');
-  assert.match(decodeURIComponent(containers[1].children[0].children[2].href), /\[CraftOrder:abc\]/);
+  assert.match(decodeURIComponent(containers[1].children[0].children[2].href), /^https:\/\/wa.me\/099\?text=\*Pedido #000005\*\nm$/); // sin UUID: el CRM resuelve por nº + teléfono
   const receipt = await ctx.CraftOrderCheckout.submit(args(() => { throw new Error('pixel roto'); }));
   assert.equal(receipt.order_number, 5);
 });
 
-// Integración real del motor de tiendas (cart.js) — flujo de demos-tiendas.
+// Integración real del motor de tiendas (cart.js) — flujo de craft-store-studio.
 function store({tracking = IDS, notify = true, fetch, open} = {}){
   const e = env({elements: ['btnCheckout', 'btnConfirm', 'cartDrawer'], fetch, open});
   e.run('tracking.js'); e.run('order-checkout.js'); e.run('cart.js');
