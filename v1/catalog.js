@@ -1314,6 +1314,9 @@
 
       const res=await fetch('productos.json',{cache:'no-store'});
       products=await res.json();
+      // El sync de craft-crm hornea "($32900.00)" en las etiquetas price_select: con price_locale se re-formatea.
+      if(config.price_locale)products.forEach(p=>(p.variantes||[]).forEach(v=>(v.options||[]).forEach(o=>{
+        if(o&&typeof o==='object'&&typeof o.price==='number'&&o.label)o.label=o.label.replace(/\s*\([^()]*\d[^()]*\)\s*$/,` (${formatPrice(o.price)})`);})));
       initTracking();
 
       buildCatStrip();
