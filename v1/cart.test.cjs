@@ -1,6 +1,6 @@
 // node cart.test.cjs  — chequea la lógica pura del carrito (sin DOM)
 const assert = require('assert');
-const { cartKey, resolveVariantPrice, cartTotalPrice, buildOrderMessage, promoOf } = require('./cart.js');
+const { cartKey, resolveVariantPrice, cartTotalPrice, buildOrderMessage, promoOf, formatPrice } = require('./cart.js');
 
 // cartKey: sin variantes = id; con variantes = estable e independiente del orden
 assert.strictEqual(cartKey(7, {}), '7');
@@ -30,3 +30,9 @@ assert(msg.includes('*Dirección:* Av 1'));
 assert(!buildOrderMessage(cart, cfg, null).includes('Cliente:'));
 
 console.log('ok — cart pure logic');
+
+// price_locale opcional: COP sin decimales con punto de miles, PEN con 2 decimales; sin locale = histórico
+assert.strictEqual(formatPrice(22900, '$'), '$22900.00');
+assert.strictEqual(formatPrice(22900, '$', 'es-CO'), '$22.900');
+assert.strictEqual(formatPrice(22.9, 'S/ ', 'es-PE', 2), 'S/ 22.90');
+assert.ok(buildOrderMessage([{ nombre: 'Burger', precio: 22900, qty: 2 }], { currency: '$', price_locale: 'es-CO' }).includes('*TOTAL: $45.800*'));

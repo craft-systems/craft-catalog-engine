@@ -184,6 +184,7 @@
     function formatPrice(n){
       const c=config.currency||'$';
       const d=Math.abs(n)<10?2:(Number.isInteger(n)?0:2);
+      if(config.price_locale){const k=config.price_decimals??0;return c+n.toLocaleString(config.price_locale,{minimumFractionDigits:k,maximumFractionDigits:k});}
       return c+n.toFixed(d);
     }
     // distribute guarda la variante como objeto {label,price}; extraer el texto o coacciona a "[object Object]".
@@ -411,7 +412,7 @@
       const badgeHTML=(badgeCat()&&(p.categorias||[]).includes(badgeCat()))?`<span class="card-badge">${catLabels[badgeCat()]||badgeCat()}</span>`:(p.precio_promo?`<span class="card-badge">${t('Oferta')}</span>`:'');
       const stockBadgeHTML=stock.badge?`<span class="card-stock-badge ${stock.cls}">${stock.badge}</span>`:'';
       const imgCountHTML=imgs.length>1?`<span class="card-img-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>${imgs.length}</span>`:'';
-      const priceDisplay=typeof p.precio==='number'?formatPrice(p.precio):(p.precio||'');
+      const priceDisplay=config.price_locale?formatPrice(parsePrice(p)):typeof p.precio==='number'?formatPrice(p.precio):(p.precio||'');
       return `
         <div class="card" data-id="${p.id}" style="animation-delay:${i*.04}s">
           <div class="card-img" data-open="${p.id}">
@@ -1015,7 +1016,7 @@
         msg+=`▸ ${item.nombre}${vLabel?' ('+vLabel+')':''}\n${item.nota?`  📝 ${item.nota}\n`:''}  ${item.qty} × ${formatPrice(item.precio)} = ${formatPrice(item.precio*item.qty)}\n`;
       });
       fees.forEach(([l,v])=>{msg+=`▸ ${l}\n  ${formatPrice(v)}\n`;});
-      msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${cur}${total.toFixed(2)}*\n\n`;
+      msg+=`━━━━━━━━━━━━━━━━━\n*TOTAL: ${config.price_locale?formatPrice(total):cur+total.toFixed(2)}*\n\n`;
       msg+=`${t('*ENTREGA:*')} ${t(mode==='delivery'?'Domicilio':mode==='mesa'?'Mesa':'Retiro en local')}\n`;
       msg+=`${t('*Cliente:*')} ${name}\n${t('*Teléfono:*')} ${phone}\n`;
       if(address) msg+=`${t('*Dirección:*')} ${address}\n`;

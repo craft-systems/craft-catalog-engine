@@ -33,7 +33,12 @@ function resolveVariantPrice(p, variantes){
   return promoOf(p) ?? (Number(p && p.precio) || 0);
 }
 
-function formatPrice(n, currency){ return `${currency || '$'}${Number(n).toFixed(2)}`; }
+// locale opcional (config.price_locale/price_decimals): COP '$22.900', PEN 'S/ 22.90'. Sin locale = formato histórico.
+function formatPrice(n, currency, locale, decimals){
+  if(!locale) return `${currency || '$'}${Number(n).toFixed(2)}`;
+  const d = decimals ?? 0;
+  return `${currency || '$'}${Number(n).toLocaleString(locale, {minimumFractionDigits:d, maximumFractionDigits:d})}`;
+}
 
 const cartTotalQty   = items => items.reduce((s,i) => s + i.qty, 0);
 const cartTotalPrice = items => items.reduce((s,i) => s + i.precio * i.qty, 0);
@@ -43,12 +48,12 @@ function buildOrderMessage(items, config, fields){
   const cur = config.currency || '$';
   const line = i => {
     const vL = i.variantes ? Object.values(i.variantes).map(variantOptDisplay).filter(Boolean).join(' · ') : '';
-    return `▸ ${i.nombre}${vL ? ' (' + vL + ')' : ''}\n  ${i.qty} × ${formatPrice(i.precio,cur)} = ${formatPrice(i.qty*i.precio,cur)}`;
+    return `▸ ${i.nombre}${vL ? ' (' + vL + ')' : ''}\n  ${i.qty} × ${formatPrice(i.precio,cur,config.price_locale,config.price_decimals)} = ${formatPrice(i.qty*i.precio,cur,config.price_locale,config.price_decimals)}`;
   };
   const title = config.order_title || (config.store_name ? `PEDIDO ${config.store_name.toUpperCase()}` : 'PEDIDO');
   let msg = `${config.whatsapp_message || 'Hola! Quiero hacer un pedido:'}\n\n*${title}*\n━━━━━━━━━━━━━━━\n`;
   msg += items.map(line).join('\n') + '\n';
-  msg += `━━━━━━━━━━━━━━━\n*TOTAL: ${formatPrice(cartTotalPrice(items),cur)}*\n`;
+  msg += `━━━━━━━━━━━━━━━\n*TOTAL: ${formatPrice(cartTotalPrice(items),cur,config.price_locale,config.price_decimals)}*\n`;
   if(fields && (fields.name || fields.phone || fields.address)){
     msg += '\n';
     if(fields.mode) msg += `*ENTREGA:* ${fields.mode === 'delivery' ? 'Domicilio' : 'Retiro en local'}\n`;
@@ -100,7 +105,7 @@ if(typeof document !== 'undefined'){ (function(){
   let toastTimer;
 
   const cur = () => state.config.currency || '$';
-  const fmt = n => formatPrice(n, cur());
+  const fmt = n => formatPrice(n, cur(), state.config.price_locale, state.config.price_decimals);
   const find = key => state.items.find(i => i.key === key);
   const save = () => { try{ localStorage.setItem(state.storageKey, JSON.stringify(state.items)); }catch(e){} };
 
