@@ -514,9 +514,10 @@
         return matchCat&&matchBrand&&matchSearch(p);
       });
       const groups={};
-      // Sección = primera categoría group_prefix si existe (el sync ordena categorias alfabéticamente).
+      // Sección = primera categoría group_prefix si existe; si no, la primera que SEA sección del menú
+      // (el sync ordena categorias alfabéticamente: un badge tipo 'chef'/'favorito' quedaba primero y ocultaba el producto).
       const gp=(config.brand_filter||{}).group_prefix,cs=p=>p.categorias||[];
-      filtered.forEach(p=>{const c=(gp&&cs(p).find(s=>s.startsWith(gp)))||cs(p)[0]||'';(groups[c]=groups[c]||[]).push(p);});
+      filtered.forEach(p=>{const c=(gp&&cs(p).find(s=>s.startsWith(gp)))||cs(p).find(s=>categorySlugs.includes(s))||cs(p)[0]||'';(groups[c]=groups[c]||[]).push(p);});
 
       const catLabels=config.categories||{};
       // Banner de promos: solo en la vista 'all' sin búsqueda (como el hero de la referencia).
